@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASR Benchmark Report - Interactive</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; line-height: 1.6; }
+        .container { max-width: 1600px; margin: 0 auto; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 2em; text-align: center; }
+        header h1 { font-size: 2.5em; margin-bottom: 0.3em; font-weight: 300; }
+        header .subtitle { opacity: 0.9; font-size: 1.1em; }
+        header .meta-info { 
+            display: flex; 
+            justify-content: center; 
+            gap: 2em; 
+            margin-top: 1.5em; 
+            font-size: 0.9em; 
+            opacity: 0.95;
+            flex-wrap: wrap;
+        }
+        header .meta-info > div { 
+            display: flex; 
+            align-items: center; 
+            gap: 0.5em;
+        }
+        header .meta-info strong { 
+            font-weight: 600; 
+            opacity: 0.8;
+        }
+        .content { padding: 2em; }
+        section { margin-bottom: 3em; }
+        h2 { color: #667eea; border-bottom: 3px solid #667eea; padding-bottom: 0.5em; margin-bottom: 1em; font-weight: 400; }
+        h3 { color: #555; margin: 1.5em 0 0.5em; font-weight: 500; }
+        
+        /* Tables */
+        table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 0.95em; }
+        th, td { border: 1px solid #ddd; padding: 0.8em; text-align: left; }
+        th { 
+            background: #667eea; 
+            color: white; 
+            font-weight: 500; 
+            position: sticky; 
+            top: 0;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+        }
+        th:hover { background: #5568d3; }
+        th.sortable::after {
+            content: ' ⇅';
+            opacity: 0.5;
+            font-size: 0.9em;
+        }
+        th.sort-asc::after {
+            content: ' ▲';
+            opacity: 1;
+        }
+        th.sort-desc::after {
+            content: ' ▼';
+            opacity: 1;
+        }
+        tr:nth-child(even) { background: #f9f9f9; }
+        tr:hover { background: #f0f0f0; }
+        td.number { text-align: right; font-family: 'Courier New', monospace; }
+        
+        /* Plotly container */
+        .plotly-container { margin: 1.5em 0; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; }
+        
+        /* Footer */
+        footer { background: #f8f9fa; padding: 1.5em; text-align: center; color: #666; font-size: 0.9em; border-top: 1px solid #ddd; }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .content { padding: 1em; }
+            header h1 { font-size: 1.8em; }
+            header .meta-info { font-size: 0.8em; gap: 1em; }
+            table { font-size: 0.85em; }
+            th, td { padding: 0.5em; }
+            
+            /* Stack transcription columns on mobile */
+            section > div > div[style*="display: flex"] {
+                display: block !important;
+            }
+            section > div > div[style*="display: flex"] > div {
+                margin-bottom: 1em;
+            }
+        }
+        
+        /* Scrollable table wrapper */
+        .table-wrapper { overflow-x: auto; }
+
+        /* Custom multi-select dropdown */
+        .filters {
+            display: flex;
+            gap: 1em;
+            margin-bottom: 1.5em;
+            flex-wrap: wrap;
+        }
+        .custom-select {
+            position: relative;
+            width: 250px;
+        }
+        .select-button {
+            width: 100%;
+            padding: 0.8em 1em;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: left;
+            font-size: 0.9em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .select-button:after {
+            content: '▼';
+            font-size: 0.8em;
+        }
+        .checkbox-list {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            z-index: 10;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .checkbox-list label {
+            display: block;
+            padding: 0.5em 1em;
+            cursor: pointer;
+        }
+        .checkbox-list label:hover {
+            background: #f0f0f0;
+        }
+        .checkbox-list input {
+            margin-right: 0.5em;
+        }
+        .select-all-buttons {
+            display: flex;
+            justify-content: space-around;
+            padding: 0.5em 0;
+            border-bottom: 1px solid #ccc;
+        }
+        .select-all-buttons button {
+            background: none;
+            border: none;
+            color: #667eea;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+        .select-all-buttons button:hover {
+            text-decoration: underline;
+        }
+        .diff-add { background-color: #d4edda; color: #155724; padding: 2px 4px; border-radius: 3px; }
+        .diff-del { background-color: #f8d7da; color: #721c24; padding: 2px 4px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎙️ ASR Benchmark Report</h1>
+            <p class="subtitle">Interactive Analysis Dashboard</p>
+            <div class="meta-info">
+                <div>
+                    <span>📅</span>
+                    <span><strong>Generated:</strong> {{ generation_date }}</span>
+                </div>
+                <div>
+                    <span>🔬</span>
+                    <span><strong>Experiments:</strong> {{ results|length }}</span>
+                </div>
+                <div>
+                    <span>🤖</span>
+                    <span><strong>Engines:</strong> {{ engines|join(', ') }}</span>
+                </div>
+                <div>
+                    <span>🌍</span>
+                    <span><strong>Languages:</strong> {{ languages|join(', ') }}</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="content">
+            <!-- Interactive Dashboard -->
+            <section>
+                <h2>📊 Interactive Dashboard</h2>
+                
+                <!-- Filters -->
+                <div class="filters">
+                    <div class="custom-select">
+                        <button class="select-button" id="engine-select-button">Engines</button>
+                        <div class="checkbox-list" id="engine-filters">
+                            <div class="select-all-buttons">
+                                <button data-action="select-all">Select All</button>
+                                <button data-action="deselect-all">Deselect All</button>
+                            </div>
+                            {% for engine in engines %}
+                            <label>
+                                <input type="checkbox" value="{{ engine }}" checked> {{ engine }}
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="custom-select">
+                        <button class="select-button" id="degradation-select-button">Degradation Types</button>
+                        <div class="checkbox-list" id="degradation-filters">
+                            <div class="select-all-buttons">
+                                <button data-action="select-all">Select All</button>
+                                <button data-action="deselect-all">Deselect All</button>
+                            </div>
+                            {% for degradation in degradations %}
+                            <label>
+                                <input type="checkbox" value="{{ degradation }}" checked> {{ degradation|capitalize }}
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="plotly-container">
+                    {{ plotly_div|safe }}
+                </div>
+            </section>
+
+            <!-- Summary Table (right under the dashboard) -->
+            <section>
+                <h2>📋 Summary Table</h2>
+                <p style="color: #666; margin-bottom: 1em; font-size: 0.9em;">
+                    💡 Click on column headers to sort • Click again to reverse order
+                </p>
+                <div class="table-wrapper">
+                    <table id="summary-table">
+                        <thead>
+                            <tr>
+                                <th class="sortable" data-column="0" data-type="text">Dataset</th>
+                                <th class="sortable" data-column="1" data-type="text">Engine</th>
+                                <th class="sortable" data-column="2" data-type="text">Language</th>
+                                <th class="sortable" data-column="3" data-type="text">Type</th>
+                                <th class="sortable" data-column="4" data-type="number">WER</th>
+                                <th class="sortable" data-column="5" data-type="number">Time (s)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in results %}
+                            <tr>
+                                <td><a href="#transcription-{{ loop.index }}">{{ row.dataset }}</a></td>
+                                <td><strong>{{ row.engine }}</strong></td>
+                                <td>{{ row.language|upper }}</td>
+                                <td>{{ row.degradation|capitalize }}</td>
+                                <td class="number" data-value="{{ row.wer if row.wer is not none else 999999 }}">{{ "%.4f"|format(row.wer) if row.wer is not none else 'N/A' }}</td>
+                                <td class="number" data-value="{{ row.time_s if row.time_s is not none else 999999 }}">{{ "%.2f"|format(row.time_s) if row.time_s is not none else 'N/A' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Detailed Transcriptions -->
+            <section>
+                <h2>📝 Detailed Transcriptions</h2>
+
+                <!-- Side by Side View -->
+                <div id="transcriptions">
+                    {% for row in results %}
+                    <div id="transcription-{{ loop.index }}" style="border: 1px solid #ddd; padding: 1.5em; margin: 1.5em 0; border-radius: 8px; background: #fafafa;">
+                        <h3 style="color: #667eea; margin-top: 0;">{{ row.dataset }} - {{ row.engine }}</h3>
+                        <div style="margin: 0.5em 0 1em; padding: 0.8em; background: white; border-radius: 4px;">
+                            <strong>WER:</strong> {{ "%.4f"|format(row.wer) if row.wer is not none else 'N/A' }} | 
+                            <strong>Time:</strong> {{ "%.2f"|format(row.time_s) }}s |
+                            <strong>Type:</strong> {{ row.degradation|capitalize }}
+                        </div>
+                        
+                        <!-- Side by side comparison -->
+                        <div style="display: flex; gap: 1em; margin-top: 1em;">
+                            <!-- Reference Text Column -->
+                            <div style="flex: 1; min-width: 0;">
+                                <p style="margin-bottom: 0.5em; font-weight: 600; color: #667eea; font-size: 1.1em;">📄 Reference Text</p>
+                                <div style="background: white; padding: 1.2em; border-left: 4px solid #667eea; border-radius: 4px; min-height: 200px; line-height: 1.8; word-wrap: break-word; overflow-wrap: break-word;">
+                                    {{ row.reference_text|safe }}
+                                </div>
+                            </div>
+                            
+                            <!-- Transcribed Text Column -->
+                            <div style="flex: 1; min-width: 0;">
+                                <p style="margin-bottom: 0.5em; font-weight: 600; color: #764ba2; font-size: 1.1em;">🎤 Transcribed Text</p>
+                                <div style="background: white; padding: 1.2em; border-left: 4px solid #764ba2; border-radius: 4px; min-height: 200px; line-height: 1.8; word-wrap: break-word; overflow-wrap: break-word;">
+                                    {{ row.transcribed_text|safe }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+        </div>
+
+        <footer>
+            <p>Generated by ASR.lab - Automatic Speech Recognition Benchmarking Platform</p>
+            <p>{{ generation_date }}</p>
+        </footer>
+    </div>
+
+    <script>
+        // Custom multi-select dropdown and Plotly filtering
+        (function() {
+            function setupDropdown(buttonId, listId) {
+                const button = document.getElementById(buttonId);
+                const list = document.getElementById(listId);
+
+                button.addEventListener('click', () => {
+                    list.style.display = list.style.display === 'block' ? 'none' : 'block';
+                });
+
+                // Close dropdown if clicking outside
+                document.addEventListener('click', (event) => {
+                    if (!button.contains(event.target) && !list.contains(event.target)) {
+                        list.style.display = 'none';
+                    }
+                });
+
+                // Add select/deselect all functionality
+                list.querySelectorAll('.select-all-buttons button').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation(); // Prevent dropdown from closing
+                        const action = e.target.dataset.action;
+                        const checkboxes = list.querySelectorAll('input[type="checkbox"]');
+                        checkboxes.forEach(cb => {
+                            cb.checked = (action === 'select-all');
+                        });
+                        // Trigger change event on the first checkbox to update the plot
+                        if (checkboxes.length > 0) {
+                            checkboxes[0].dispatchEvent(new Event('change'));
+                        }
+                    });
+                });
+            }
+
+            setupDropdown('engine-select-button', 'engine-filters');
+            setupDropdown('degradation-select-button', 'degradation-filters');
+
+            // Wait for Plotly to be available
+            const checkPlotly = setInterval(function() {
+                if (window.Plotly) {
+                    clearInterval(checkPlotly);
+                    initializeFilters();
+                }
+            }, 100);
+
+            function initializeFilters() {
+                const chartDiv = document.getElementById('plotly-chart');
+                if (!chartDiv || !chartDiv.data) return;
+
+                const engineCheckboxes = document.querySelectorAll('#engine-filters input[type="checkbox"]');
+                const degradationCheckboxes = document.querySelectorAll('#degradation-filters input[type="checkbox"]');
+
+                function updatePlotVisibility() {
+                    const selectedEngines = Array.from(engineCheckboxes)
+                        .filter(cb => cb.checked)
+                        .map(cb => cb.value);
+                    
+                    const selectedDegradations = Array.from(degradationCheckboxes)
+                        .filter(cb => cb.checked)
+                        .map(cb => cb.value);
+
+                    if (!chartDiv.data) return;
+
+                    const visibility = chartDiv.data.map(trace => {
+                        const traceName = trace.name || '';
+                        const parts = traceName.split(' (');
+                        if (parts.length < 2) return false;
+                        
+                        const engine = parts[0];
+                        const degradation = parts[1].slice(0, -1);
+
+                        return selectedEngines.includes(engine) && selectedDegradations.includes(degradation);
+                    });
+
+                    Plotly.restyle(chartDiv, { visible: visibility });
+                }
+
+                engineCheckboxes.forEach(cb => cb.addEventListener('change', updatePlotVisibility));
+                degradationCheckboxes.forEach(cb => cb.addEventListener('change', updatePlotVisibility));
+            }
+        })();
+
+        // Sortable table functionality
+        (function() {
+            const table = document.getElementById('summary-table');
+            if (!table) return;
+
+            const headers = table.querySelectorAll('th.sortable');
+            let currentSort = { column: -1, ascending: true };
+
+            headers.forEach(header => {
+                header.addEventListener('click', function() {
+                    const column = parseInt(this.dataset.column);
+                    const type = this.dataset.type;
+                    
+                    // Toggle sort direction if clicking same column
+                    if (currentSort.column === column) {
+                        currentSort.ascending = !currentSort.ascending;
+                    } else {
+                        currentSort.column = column;
+                        currentSort.ascending = true;
+                    }
+
+                    // Update header classes
+                    headers.forEach(h => {
+                        h.classList.remove('sort-asc', 'sort-desc');
+                    });
+                    this.classList.add(currentSort.ascending ? 'sort-asc' : 'sort-desc');
+
+                    // Sort the table
+                    sortTable(column, type, currentSort.ascending);
+                });
+            });
+
+            function sortTable(column, type, ascending) {
+                const tbody = table.querySelector('tbody');
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+
+                rows.sort((a, b) => {
+                    let aValue, bValue;
+
+                    if (type === 'number') {
+                        // Use data-value attribute for numbers (handles N/A)
+                        aValue = parseFloat(a.cells[column].dataset.value || a.cells[column].textContent);
+                        bValue = parseFloat(b.cells[column].dataset.value || b.cells[column].textContent);
+                    } else {
+                        // Text comparison
+                        aValue = a.cells[column].textContent.trim().toLowerCase();
+                        bValue = b.cells[column].textContent.trim().toLowerCase();
+                    }
+
+                    if (aValue < bValue) return ascending ? -1 : 1;
+                    if (aValue > bValue) return ascending ? 1 : -1;
+                    return 0;
+                });
+
+                // Clear and re-append sorted rows
+                tbody.innerHTML = '';
+                rows.forEach(row => tbody.appendChild(row));
+            }
+        })();
+    </script>
+</body>
+</html>

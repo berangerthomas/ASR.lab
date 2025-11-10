@@ -1,3 +1,7 @@
+# Fichiers projet
+audio_test/
+models/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

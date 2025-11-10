@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASR Benchmark Report</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; background-color: #f9f9f9; color: #333; }
+        h1, h2, h3 { color: #333; }
+        .container { max-width: 1400px; margin: auto; background-color: #fff; padding: 2em; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
+        .plot { margin-bottom: 2em; text-align: center; }
+        img { max-width: 100%; height: auto; border: 1px solid #ddd; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 2em; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        .tabs { display: flex; border-bottom: 2px solid #ddd; margin-bottom: 1em; }
+        .tab-button { background-color: #f2f2f2; border: 1px solid #ddd; border-bottom: none; padding: 10px 20px; cursor: pointer; font-size: 1em; }
+        .tab-button.active { background-color: #fff; border-bottom: 2px solid #fff; position: relative; top: 2px; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .segment { margin-bottom: 0.5em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ASR Benchmark Report</h1>
+        <p>Generated on: {{ generation_date }}</p>
+
+        <h2>Visualizations</h2>
+        
+        <!-- Interactive Plotly Dashboard -->
+        {% if plots.interactive_dashboard %}
+        <div class="plot">
+            <h3>Interactive Dashboard</h3>
+            <p style="color: #666; font-style: italic; margin-bottom: 10px;">
+                💡 Use the dropdown menus to filter by engine or degradation type. 
+                Hover over points for details. Click and drag to zoom. Double-click to reset.
+            </p>
+            <iframe src="interactive_dashboard.html" width="100%" height="1000" frameborder="0" style="border: 1px solid #ddd;"></iframe>
+        </div>
+        {% endif %}
+        
+        <!-- Static Matplotlib plots (fallback) -->
+        {% if plots.wer_vs_time_combined %}
+        <div class="plot">
+            <h3>Performance on Combined Audio (Static)</h3>
+            <img src="wer_vs_time_combined.png" alt="WER vs. Time Combined Plot">
+        </div>
+        {% endif %}
+        {% if plots.wer_vs_time_original %}
+        <div class="plot">
+            <h3>Performance on Original Audio (Static)</h3>
+            <img src="wer_vs_time_original.png" alt="WER vs. Time Original Plot">
+        </div>
+        {% endif %}
+        {% if plots.wer_vs_time_degraded %}
+        <div class="plot">
+            <h3>Performance on Degraded Audio (Static)</h3>
+            <img src="wer_vs_time_degraded.png" alt="WER vs. Time Degraded Plot">
+        </div>
+        {% endif %}
+
+        <h2>Detailed Results</h2>
+        <div class="tabs">
+            <button class="tab-button active" onclick="openTab(event, 'summary')">Summary</button>
+            <button class="tab-button" onclick="openTab(event, 'timestamps')">Transcription Details</button>
+        </div>
+
+        <div id="summary" class="tab-content active">
+            <h3>Summary Table</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Dataset</th>
+                        <th>Engine</th>
+                        <th>Language</th>
+                        <th>Degradation</th>
+                        <th>WER</th>
+                        <th>Time (s)</th>
+                        <th>Reference Text</th>
+                        <th>Transcribed Text</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in results %}
+                    <tr>
+                        <td>{{ row.dataset }}</td>
+                        <td>{{ row.engine }}</td>
+                        <td>{{ row.language }}</td>
+                        <td>{{ row.degradation }}</td>
+                        <td>{{ "%.4f"|format(row.wer) if row.wer is not none }}</td>
+                        <td>{{ "%.2f"|format(row.time_s) if row.time_s is not none }}</td>
+                        <td>{{ row.reference_text }}</td>
+                        <td>{{ row.transcription.text }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div id="timestamps" class="tab-content">
+            <h3>Transcription Details with Timestamps</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Dataset</th>
+                        <th>Engine</th>
+                        <th>Segments</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in results %}
+                    <tr>
+                        <td>{{ row.dataset }}</td>
+                        <td>{{ row.engine }}</td>
+                        <td>
+                            {% if row.transcription.segments %}
+                                {% for segment in row.transcription.segments %}
+                                    <div class="segment">
+                                        <strong>[{{ "%.2f"|format(segment.timestamp[0]) }}s - {{ "%.2f"|format(segment.timestamp[1]) }}s]:</strong> {{ segment.text }}
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                No timestamp data available.
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        function openTab(evt, tabName) {
+            var i, tabcontent, tablinks;
+            tabcontent = document.getElementsByClassName("tab-content");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+            }
+            tablinks = document.getElementsByClassName("tab-button");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+            document.getElementById(tabName).style.display = "block";
+            evt.currentTarget.className += " active";
+        }
+    </script>
+</body>
+</html>

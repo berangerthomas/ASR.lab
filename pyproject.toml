@@ -1,0 +1,30 @@
+[project]
+name = "asr-lab"
+version = "0.1.0"
+description = "Benchmarking platform for automatic speech recognition models using controlled audio degradation, multiple evaluation metrics, and comparative analysis across languages and model architectures."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "accelerate>=1.10.1",
+    "click",
+    "datasets[audio]>=4.2.0",
+    "evaluate>=0.4.6",
+    "jiwer>=4.0.0",
+    "joblib",
+    "librosa",
+    "matplotlib>=3.10.7",
+    "pandas",
+    "pedalboard",
+    "plotly>=5.24.0",
+    "pyaudio>=0.2.14",
+    "pyloudnorm",
+    "seaborn>=0.13.2",
+    "jinja2",
+    "torch",
+    "transformers==4.41.2",
+    "vosk>=0.3.45",
+    "torchaudio>=2.8.0",
+    "sentencepiece>=0.2.1",
+    "protobuf>=6.33.0",
+    "nemo_toolkit[asr]>=1.21.0",
+]

@@ -1,0 +1,67 @@
+# Multi-Engine Benchmark Configuration
+
+benchmark:
+  name: "multi_engine_test"
+  description: "Comparison multiple engines and degradations"
+
+data:
+  audio_source_dir: "data/audio"
+  processed_dir: "data/processed"
+  reference_dir: "data/references"
+
+audio_processing:
+  sample_rate: 16000
+  channels: 1
+  normalization:
+    enabled: true
+    target_loudness: -22.0
+
+degradations:
+  vst_plugin_path: "C:/Program Files/Common Files/VST3/PlaceIt.vst3"
+  presets:
+    - name: "cathedral"
+      preset_name: "Cathedral"
+    - name: "police_radio_car"
+      preset_name: "Police Radio, Car"
+
+engines:
+  whisper:
+    - id: "whisper-tiny"
+      model_id: "openai/whisper-tiny"
+      enabled: true
+    - id: "whisper-small"
+      model_id: "openai/whisper-small"
+      enabled: true
+    - id: "whisper-large-v3"
+      model_id: "openai/whisper-large-v3"
+      enabled: true
+  
+  wav2vec2:
+    - id: "wav2vec2-base-fr"
+      model_id: "facebook/wav2vec2-large-xlsr-53-french"
+      enabled: true
+  
+  seamless:
+    - id: "seamless-m4t-v2-large"
+      model_name: "facebook/seamless-m4t-v2-large"
+      enabled: true  
+    - id: "seamless-m4t-medium"
+      model_name: "facebook/hf-seamless-m4t-medium"
+      enabled: true  
+  
+  vosk:
+    - id: "vosk-small-fr"
+      model_path: "models/vosk-model-small-fr-0.22"
+      enabled: true
+    - id: "vosk-fr"
+      model_path: "models/vosk-model-fr-0.22"
+      enabled: true
+  
+  nemo:
+    - id: "nemo-parakeet-fr-conformer-ctc-large"
+      model_name: "stt_fr_conformer_ctc_large"
+      enabled: true
+
+metrics:
+  - name: "wer"
+    enabled: true
