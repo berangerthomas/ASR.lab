@@ -1,37 +1,55 @@
 # ASR.lab
 
-A comprehensive benchmarking platform for automatic speech recognition (ASR) systems. This tool provides controlled audio degradation, multiple evaluation metrics, and comparative analysis across languages and model architectures.
+A comprehensive benchmarking platform for automatic speech recognition (ASR) systems. This tool provides controlled audio degradation, audio enhancement, loudness normalization, multiple evaluation metrics, and comparative analysis across languages and model architectures.
 
 ## Overview
 
-ASR.lab enables systematic evaluation of speech recognition engines under various acoustic conditions. It supports multiple ASR frameworks, applies configurable audio degradations, and generates detailed performance reports with interactive visualizations.
+ASR.lab enables systematic evaluation of speech recognition engines under various acoustic conditions. It supports multiple ASR frameworks, applies configurable audio degradations, tests audio enhancement algorithms, and generates detailed performance reports with interactive visualizations.
 
 ## Features
 
-- **Multi-Engine Support**: Compare performance across different ASR frameworks
-- **Audio Degradation**: Apply controlled acoustic degradations (reverb, noise, compression)
-- **Evaluation Metrics**: Word Error Rate (WER), Character Error Rate (CER), and more
-- **Interactive Reports**: HTML reports with sortable tables and Plotly visualizations
+- **Multi-Engine Support**: Compare performance across different ASR frameworks (Whisper, Wav2Vec2, NeMo, Vosk, SeamlessM4T, etc.)
+- **Audio Degradation**: Apply controlled acoustic degradations (reverb, noise, compression) via VST3 plugins
+- **Audio Enhancement**: Test denoising/enhancement algorithms (Demucs, DeepFilterNet) on degraded audio
+- **Loudness Normalization**: Grid search across different LUFS normalization levels (EBU R128 compliant)
+- **Evaluation Metrics**: WER, CER, MER, WIL, WIP for comprehensive transcription analysis
+- **Interactive Reports**: HTML reports with sortable tables, Plotly visualizations, and multi-filter dropdowns
 - **Multilingual**: Support for multiple languages and language-specific models
 - **Extensible**: Plugin architecture for adding new engines and metrics
+- **Grid Search**: Automatic Cartesian product of all test parameters (degradation × enhancement × normalization)
+
+## Processing Pipeline
+
+The benchmark pipeline processes audio in the following order:
+
+```
+Original Audio → Degradation (VST3) → Enhancement (Demucs) → Normalization (LUFS) → ASR Engine → Metrics
+```
+
+Each stage is optional and configurable. Multiple options at each stage create a grid search.
 
 ## Supported ASR Engines
 
-### Open-Source Models
+| Engine | Status | Notes |
+|--------|--------|-------|
+| Whisper (OpenAI) | Tested | Multilingual, multiple model sizes |
+| Wav2Vec 2.0 (Meta) | Tested | Language-specific fine-tuning |
+| SeamlessM4T (Meta) | Tested | Multilingual translation and transcription |
+| Vosk | Tested | Offline recognition, requires local model |
+| HuBERT (Meta) | Experimental | Uses Wav2Vec2 tokenizer fallback |
+| NeMo (NVIDIA) | Linux only | Does not work on Windows (SIGKILL) |
+| Kaldi | Not implemented | Requires external Kaldi installation |
+| USM (Google) | Not implemented | API not available |
 
-- **Whisper** (OpenAI): Multilingual transformer-based model with high accuracy
-- **Wav2Vec 2.0** (Meta): Self-supervised learning model with strong performance
-- **HuBERT** (Meta): Masked prediction model for speech representation
-- **SeamlessM4T** (Meta): Multilingual multimodal translation and transcription
-- **Vosk** (Alpha Cephei): Lightweight offline recognition based on Kaldi
-- **NeMo** (NVIDIA): Suite including Parakeet, QuartzNet, and Conformer models. Now includes French ASR-trained models like `stt_fr_conformer_ctc_large`.
-- **Kaldi** (External): Traditional GMM-HMM and DNN framework via subprocess
+## Evaluation Metrics
 
-### Cloud API Support
-
-- **Google Cloud Speech-to-Text**
-- **Azure Speech Services**
-- **Deepgram**
+| Metric | Name | Description |
+|--------|------|-------------|
+| **WER** | Word Error Rate | Standard ASR metric: (S+D+I)/N |
+| **CER** | Character Error Rate | Better for CJK languages |
+| **MER** | Match Error Rate | Bounded version of WER (0-1) |
+| **WIL** | Word Information Lost | Proportion of information lost |
+| **WIP** | Word Information Preserved | Complement of WIL |
 
 ## Installation
 
@@ -44,7 +62,7 @@ ASR.lab enables systematic evaluation of speech recognition engines under variou
 ### Basic Installation
 
 ```bash
-git clone https://github.com/yourusername/ASR.lab.git
+git clone https://github.com/berangerthomas/ASR.lab.git
 cd ASR.lab
 pip install -e .
 ```
@@ -68,6 +86,8 @@ pip install nemo_toolkit[asr]
 
 Benchmarks are defined in YAML configuration files located in `configs/`.
 
+See `configs/reference_complete.yaml` for a complete configuration reference.
+
 ### Basic Configuration Structure
 
 ```yaml
@@ -83,21 +103,37 @@ data:
 audio_processing:
   sample_rate: 16000
   channels: 1
-  normalization:
-    enabled: true
-    target_loudness: -22.0
 
+# Loudness normalization (grid search)
+normalizations:
+  - name: "broadcast"
+    enabled: true
+    method: "lufs"
+    target_loudness: -23.0
+  - name: "no_norm"
+    enabled: true
+    method: "none"
+
+# Audio degradation via VST3 plugins
 degradations:
   vst_plugin_path: "path/to/reverb.vst3"
   presets:
     - name: "cathedral"
       preset_name: "Cathedral"
 
+# Audio enhancement/denoising
+enhancements:
+  - name: "demucs"
+    enabled: true
+    method: "demucs"
+    model_name: "htdemucs"
+
 engines:
   whisper:
     - id: "whisper-tiny"
       model_id: "openai/whisper-tiny"
       enabled: true
+      chunk_length_s: 30
   
   wav2vec2:
     - id: "wav2vec2-fr"
@@ -107,117 +143,9 @@ engines:
 metrics:
   - name: "wer"
     enabled: true
-```
-
-### Engine-Specific Configuration
-
-#### Whisper
-
-```yaml
-whisper:
-  - id: "whisper-base"
-    model_id: "openai/whisper-base"
+  - name: "cer"
     enabled: true
 ```
-
-Available models: `whisper-tiny`, `whisper-base`, `whisper-small`, `whisper-medium`, `whisper-large-v3`
-
-#### Wav2Vec2
-
-```yaml
-wav2vec2:
-  - id: "wav2vec2-fr"
-    model_id: "facebook/wav2vec2-large-xlsr-53-french"
-    enabled: true
-```
-
-Compatible with any Wav2Vec2 model from Hugging Face Hub.
-
-#### HuBERT
-
-```yaml
-hubert:
-  - id: "hubert-large"
-    model_id: "facebook/hubert-large-ls960-ft"
-    enabled: true
-```
-
-#### Vosk
-
-Vosk requires downloading and extracting pre-trained models manually.
-
-1. Download models from [https://alphacephei.com/vosk/models](https://alphacephei.com/vosk/models)
-2. Extract ZIP archives to `models/` directory:
-
-```bash
-# Windows (PowerShell)
-Expand-Archive -Path vosk-model-fr-0.22.zip -DestinationPath models/
-
-# Linux/Mac
-unzip vosk-model-fr-0.22.zip -d models/
-```
-
-3. Configure in YAML:
-
-```yaml
-vosk:
-  - id: "vosk-fr"
-    model_path: "models/vosk-model-fr-0.22"
-    enabled: true
-```
-
-The extracted folder structure should contain:
-
-```
-models/
-└── vosk-model-fr-0.22/
-    ├── am/
-    ├── conf/
-    ├── graph/
-    └── ivector/
-```
-
-Recommended models:
-
-- French: `vosk-model-fr-0.22` (1.4GB)
-- English: `vosk-model-en-us-0.22` (1.8GB)
-- Small models: `vosk-model-small-fr-0.22` (41MB) for resource-constrained environments
-
-#### NeMo
-
-```yaml
-nemo:
-  - id: "nemo-fr-conformer-ctc-large"
-    model_name: "stt_fr_conformer_ctc_large"
-    enabled: true
-```
-
-Available French models:
-
-- `stt_fr_conformer_ctc_large`: High-accuracy French ASR model
-- `stt_fr_conformer_transducer_large`: Alternative transducer architecture
-- `stt_fr_fastconformer_hybrid_large_pc`: FastConformer with hybrid CTC/Transducer
-
-Available English models:
-
-- `stt_en_conformer_ctc_large`: English Conformer CTC model
-- `stt_en_fastconformer_ctc_large`: FastConformer for English
-
-Requires `nemo_toolkit[asr]` installation.
-
-#### Kaldi
-
-Kaldi requires external installation and custom scripts.
-
-```yaml
-kaldi:
-  - id: "kaldi-aspire"
-    model_dir: "/path/to/kaldi/model"
-    script_path: "/path/to/decode_script.sh"
-    enabled: true
-```
-
-The script should accept audio file path and model directory as arguments and output transcription to stdout.
 
 ## Usage
 
@@ -247,85 +175,14 @@ Results are saved to `results/reports/`:
 
 Open `results/reports/report_interactive.html` in a web browser. The report includes:
 
-- Interactive Plotly charts with engine and degradation filters
+- Interactive Plotly charts with multi-filter dropdowns (engine, degradation, enhancement, normalization)
 - Sortable summary table (click column headers)
-- Side-by-side transcription comparison
-- Performance metrics (WER, processing time)
-
-## Audio Degradation
-
-The platform supports controlled audio degradation through VST3 plugins.
-
-### VST Plugin Installation
-
-You can install VST3 plugins in two ways:
-
-1. **System-Wide Installation (Recommended for most users)**:
-   - **Windows**: Place the `.vst3` file in `C:/Program Files/Common Files/VST3/`.
-   - **macOS**: Place the `.vst3` file in `/Library/Audio/Plug-Ins/VST3/`.
-   - **Linux**: Place the `.vst3` file in `~/.vst3/` or `/usr/lib/vst3/`.
-
-2. **Local Project Installation (for portability)**:
-   - Place the `.vst3` file directly into the `vst_plugins/` directory at the root of this project.
-   - This method is ideal for ensuring that all project contributors use the exact same plugin version.
-
-### Configuration in YAML
-
-After installation, specify the path to the `.vst3` file in your configuration file (`configs/*.yaml`).
-
-**Example for a system-wide plugin:**
-
-```yaml
-degradations:
-  vst_plugin_path: "C:/Program Files/Common Files/VST3/PlaceIt.vst3"
-  presets:
-    - name: "cathedral"
-      preset_name: "Cathedral"
-```
-
-**Example for a local project plugin:**
-
-```yaml
-degradations:
-  vst_plugin_path: "vst_plugins/PlaceIt.vst3"
-  presets:
-    - name: "cathedral"
-      preset_name: "Cathedral"
-```
-
-### Pristine Audio
-
-Pristine (unmodified) audio is automatically included for baseline comparison.
-
-## Metrics
-
-### Word Error Rate (WER)
-
-Primary metric for ASR evaluation. Calculates insertions, deletions, and substitutions at word level.
-
-```yaml
-metrics:
-  - name: "wer"
-    enabled: true
-```
-
-### Character Error Rate (CER)
-
-Character-level accuracy metric.
-
-```yaml
-metrics:
-  - name: "cer"
-    enabled: true
-```
-
-### Additional Metrics
-
-- **MER**: Match Error Rate
-- **RTF**: Real-Time Factor (processing speed)
-- **Latency**: Processing time in seconds
+- Side-by-side transcription comparison with diff highlighting
+- Performance metrics (WER, CER, processing time)
 
 ## Data Organization
+
+### Option 1: File-based (Simple)
 
 ```text
 data/
@@ -335,9 +192,27 @@ data/
 ```
 
 Audio files should be named consistently with reference files:
-
-- Audio: `fr_0.wav`
+- Audio: `fr_0.wav` (prefix `fr` indicates language)
 - Reference: `fr_0.txt`
+
+### Option 2: Manifest-based (Robust)
+
+Create a `manifest.json` in your audio directory:
+
+```json
+[
+  {
+    "audio_filepath": "data/audio/sample1.wav",
+    "text": "This is a sample transcription.",
+    "lang": "en"
+  },
+  {
+    "audio_filepath": "data/audio/sample2.wav",
+    "text": "Ceci est une transcription.",
+    "lang": "fr"
+  }
+]
+```
 
 ## Extending the Platform
 
@@ -378,21 +253,6 @@ ENGINE_REGISTRY = {
 }
 ```
 
-### Adding a New Metric
-
-1. Create metric class in `src/asr_lab/metrics/`:
-
-```python
-from .base import Metric
-
-class MyMetric(Metric):
-    def compute(self, reference: str, hypothesis: str) -> float:
-        # Compute metric
-        return score
-```
-
-2. Register in `src/asr_lab/config/metric_registry.py`
-
 ## Performance Considerations
 
 ### GPU Acceleration
@@ -404,25 +264,6 @@ import torch
 print(torch.cuda.is_available())
 ```
 
-### Memory Requirements
-
-Approximate memory requirements:
-
-- Whisper tiny/base: 1-2GB
-- Whisper small/medium: 2-5GB
-- Whisper large: 10GB+
-- Wav2Vec2/HuBERT: 3-5GB
-- SeamlessM4T: 8GB+
-
-### Processing Speed
-
-Real-time factor (RTF) varies by model:
-
-- Vosk: 0.1-0.3x (faster than real-time)
-- Whisper tiny: 0.3-0.5x
-- Whisper small/medium: 0.5-1.5x
-- Large models: 2-5x (slower than real-time)
-
 ## Troubleshooting
 
 ### ModuleNotFoundError
@@ -430,7 +271,7 @@ Real-time factor (RTF) varies by model:
 Install missing dependencies:
 
 ```bash
-pip install librosa transformers torch
+pip install librosa transformers torch tqdm ruff
 ```
 
 ### CUDA Out of Memory
@@ -440,42 +281,17 @@ Reduce batch size or use smaller models. For Whisper, use tiny or base variants.
 ### Audio Format Errors
 
 Ensure audio files are:
-
 - WAV format
 - 16kHz sample rate (or configure accordingly)
 - Mono channel
 
-Convert using ffmpeg:
-
-```bash
-ffmpeg -i input.mp3 -ar 16000 -ac 1 output.wav
-```
-
 ### Vosk Model Not Found
 
-Download models from [https://alphacephei.com/vosk/models](https://alphacephei.com/vosk/models) and extract the ZIP archives to `models/` directory. Do not leave models as ZIP files - they must be extracted folders containing `am/`, `conf/`, `graph/`, and `ivector/` subdirectories.
-
-Example extraction:
-
-```bash
-# Windows
-Expand-Archive vosk-model-fr-0.22.zip -DestinationPath models/
-
-# Verify structure
-ls models/vosk-model-fr-0.22/
-# Should show: am, conf, graph, ivector
-```
+Download models from [https://alphacephei.com/vosk/models](https://alphacephei.com/vosk/models) and extract the ZIP archives to `models/` directory.
 
 ## License
 
 See LICENSE file for details.
-
-## References
-
-- Whisper: [OpenAI Whisper Paper](https://cdn.openai.com/papers/whisper.pdf)
-- Wav2Vec 2.0: [Facebook Research](https://ai.facebook.com/blog/wav2vec-20-learning-the-structure-of-speech-from-raw-audio/)
-- HuBERT: [Paper on arXiv](https://arxiv.org/abs/2106.07447)
-- Vosk: [Alpha Cephei](https://alphacephei.com/vosk/)
 
 ## Contributing
 

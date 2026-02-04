@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASR Benchmark Report</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #34495e;
+            --accent-color: #3498db;
+            --bg-color: #f8f9fa;
+            --text-color: #333;
+            --border-color: #e9ecef;
+            --success-bg: #d4edda;
+            --success-text: #155724;
+            --danger-bg: #f8d7da;
+            --danger-text: #721c24;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: var(--bg-color); color: var(--text-color); line-height: 1.5; font-size: 14px; }
+        .container { max-width: 100%; margin: 0; background: white; }
+        
+        /* Compact Header */
+        header { background: var(--primary-color); color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        header h1 { font-size: 1.5rem; font-weight: 600; margin: 0; }
+        header .meta-info { display: flex; gap: 2rem; font-size: 0.9rem; opacity: 0.9; }
+        header .meta-info div { display: flex; align-items: center; gap: 0.5rem; }
+        
+        .content { padding: 1.5rem 2rem; }
+        section { margin-bottom: 2rem; background: white; border: 1px solid var(--border-color); border-radius: 4px; padding: 1.5rem; }
+        h2 { color: var(--primary-color); font-size: 1.2rem; border-bottom: 2px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1rem; font-weight: 600; }
+        h3 { color: var(--secondary-color); margin: 0 0 0.5rem; font-size: 1rem; font-weight: 600; }
+        
+        /* Compact Tables */
+        .table-wrapper { overflow-x: auto; border: 1px solid var(--border-color); border-radius: 4px; }
+        table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+        th, td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+        th { background: #f1f3f5; color: var(--secondary-color); font-weight: 600; cursor: pointer; user-select: none; white-space: nowrap; }
+        th:hover { background: #e9ecef; }
+        tr:hover { background: #f8f9fa; }
+        td.number { text-align: right; font-family: 'Consolas', monospace; }
+        
+        /* Plotly container */
+        .plotly-container { height: 500px; border: 1px solid var(--border-color); border-radius: 4px; }
+        
+        /* Filters */
+        .filters { display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center; background: #f8f9fa; padding: 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); flex-wrap: wrap; }
+        .custom-select { position: relative; width: 200px; }
+        .select-button { width: 100%; padding: 0.5rem 0.75rem; background: white; border: 1px solid #ced4da; border-radius: 4px; cursor: pointer; text-align: left; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; }
+        .select-button:after { content: '▼'; font-size: 0.8em; margin-left: 0.5rem; }
+        .checkbox-list { display: none; position: absolute; top: 100%; left: 0; width: 100%; background: white; border: 1px solid #ced4da; border-radius: 4px; z-index: 10; max-height: 250px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .checkbox-list label { display: block; padding: 0.5rem 0.75rem; cursor: pointer; font-size: 0.9rem; }
+        .checkbox-list label:hover { background: #f8f9fa; }
+        .checkbox-list input { margin-right: 0.5rem; }
+        .select-all-buttons { display: flex; justify-content: space-between; padding: 0.5rem 0.75rem; border-bottom: 1px solid #e9ecef; background: #f8f9fa; }
+        .select-all-buttons button { background: none; border: none; color: var(--accent-color); cursor: pointer; font-size: 0.8rem; font-weight: 600; }
+        .select-all-buttons button:hover { text-decoration: underline; }
+        
+        /* Radio buttons for metric selection */
+        .metric-radio-group { display: flex; gap: 0.25rem; flex-wrap: wrap; }
+        .metric-radio-group label { 
+            padding: 0.4rem 0.75rem; 
+            background: white; 
+            border: 1px solid #ced4da; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-size: 0.85rem;
+            transition: all 0.15s ease;
+            user-select: none;
+        }
+        .metric-radio-group label:hover { background: #e9ecef; }
+        .metric-radio-group input[type="radio"] { display: none; }
+        .metric-radio-group label:has(input:checked) {
+            background: var(--accent-color); 
+            color: white; 
+            border-color: var(--accent-color);
+        }
+        
+        /* Diff View Selector Bar */
+        .diff-view-bar { 
+            display: flex; 
+            align-items: center; 
+            gap: 1rem; 
+            margin-bottom: 1rem; 
+            padding: 0.75rem; 
+            background: #f8f9fa; 
+            border-radius: 4px; 
+            border: 1px solid var(--border-color);
+        }
+        
+        /* Diff Highlighting */
+        .diff-add { background-color: var(--success-bg); color: var(--success-text); padding: 1px 3px; border-radius: 2px; text-decoration: none; }
+        .diff-del { background-color: var(--danger-bg); color: var(--danger-text); padding: 1px 3px; border-radius: 2px; text-decoration: none; opacity: 0.8; }
+        
+        /* Transcription View */
+        .transcription-card { border: 1px solid var(--border-color); margin-bottom: 1rem; border-radius: 4px; overflow: hidden; }
+        .transcription-header { background: #f8f9fa; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .transcription-stats { font-size: 0.85rem; color: var(--secondary-color); display: flex; gap: 1.5rem; }
+        .transcription-body { display: grid; grid-template-columns: 1fr 1fr; }
+        .transcription-col { padding: 1rem; }
+        .transcription-col:first-child { border-right: 1px solid var(--border-color); background: #fafbfc; }
+        .col-header { font-weight: 600; color: var(--secondary-color); margin-bottom: 0.5rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; }
+        .text-content { font-family: 'Georgia', serif; line-height: 1.6; font-size: 0.95rem; color: #2c3e50; }
+        
+        footer { text-align: center; padding: 2rem; color: #6c757d; font-size: 0.85rem; border-top: 1px solid var(--border-color); margin-top: 2rem; }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            header { flex-direction: column; gap: 1rem; text-align: center; }
+            .transcription-body { grid-template-columns: 1fr; }
+            .transcription-col:first-child { border-right: none; border-bottom: 1px solid var(--border-color); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>ASR Benchmark Report</h1>
+            <div class="meta-info">
+                <div><strong>Date:</strong> {{ generation_date }}</div>
+                <div><strong>Experiments:</strong> {{ results|length }}</div>
+                <div><strong>Engines:</strong> {{ engines|length }}</div>
+            </div>
+        </header>
+
+        <!-- Global Filters -->
+        <div style="background: white; padding: 1rem 2rem; border-bottom: 1px solid var(--border-color);">
+            <div class="filters" style="margin: 0; border: none; background: none; padding: 0;">
+                <div class="custom-select">
+                    <button class="select-button" id="engine-select-button">Engines</button>
+                    <div class="checkbox-list" id="engine-filters">
+                        <div class="select-all-buttons">
+                            <button data-action="select-all">Select All</button>
+                            <button data-action="deselect-all">Deselect All</button>
+                        </div>
+                        {% for engine in engines %}
+                        <label>
+                            <input type="checkbox" value="{{ engine }}" checked> {{ engine }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="custom-select">
+                    <button class="select-button" id="degradation-select-button">Degradation Types</button>
+                    <div class="checkbox-list" id="degradation-filters">
+                        <div class="select-all-buttons">
+                            <button data-action="select-all">Select All</button>
+                            <button data-action="deselect-all">Deselect All</button>
+                        </div>
+                        {% for degradation in degradations %}
+                        <label>
+                            <input type="checkbox" value="{{ degradation }}" checked> {{ degradation|capitalize }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="custom-select">
+                    <button class="select-button" id="enhancement-select-button">Enhancement Types</button>
+                    <div class="checkbox-list" id="enhancement-filters">
+                        <div class="select-all-buttons">
+                            <button data-action="select-all">Select All</button>
+                            <button data-action="deselect-all">Deselect All</button>
+                        </div>
+                        {% for enhancement in enhancements %}
+                        <label>
+                            <input type="checkbox" value="{{ enhancement }}" checked> {{ enhancement|capitalize }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="custom-select">
+                    <button class="select-button" id="normalization-select-button">Normalization Types</button>
+                    <div class="checkbox-list" id="normalization-filters">
+                        <div class="select-all-buttons">
+                            <button data-action="select-all">Select All</button>
+                            <button data-action="deselect-all">Deselect All</button>
+                        </div>
+                        {% for normalization in normalizations %}
+                        <label>
+                            <input type="checkbox" value="{{ normalization }}" checked> {{ normalization|capitalize }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="content">
+            <!-- Dashboard -->
+            <section>
+                <h2>Performance Overview</h2>
+                
+                <!-- Chart Metric Radio Buttons -->
+                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; padding: 0.75rem; background: #f8f9fa; border-radius: 4px; border: 1px solid var(--border-color);">
+                    <span style="font-weight: 600; color: var(--secondary-color);">Chart Metric:</span>
+                    <div class="metric-radio-group" id="metric-radios">
+                        {% for key, info in metrics_info.items() %}
+                        <label>
+                            <input type="radio" name="chart-metric" value="{{ key }}" {% if key == 'wer' %}checked{% endif %}>
+                            <span style="pointer-events: none;">{{ key|upper }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <div class="plotly-container">
+                    {{ plotly_div|safe }}
+                </div>
+            </section>
+
+            <!-- Metrics Heatmap -->
+            <section>
+                <h2>Metrics Heatmap</h2>
+                <p style="color: var(--secondary-color); font-size: 0.9rem; margin-bottom: 1rem;">Each row represents a unique combination of Engine × Degradation × Enhancement × Normalization. Colors indicate metric values (green = better, red = worse).</p>
+                <div id="metrics-heatmap" style="height: 500px; border: 1px solid var(--border-color); border-radius: 4px; overflow-y: auto;"></div>
+            </section>
+
+            <!-- Detailed Transcriptions -->
+            <section>
+                <h2>Detailed Analysis</h2>
+                
+                <!-- Diff View Selector -->
+                <div class="diff-view-bar">
+                    <span style="font-weight: 600; color: var(--secondary-color);">Diff View:</span>
+                    <div class="metric-radio-group" id="diff-view-radios">
+                        <label>
+                            <input type="radio" name="diff-view" value="words" checked>
+                            <span style="pointer-events: none;">Word-level (WER/MER/WIL/WIP)</span>
+                        </label>
+                        <label>
+                            <input type="radio" name="diff-view" value="chars">
+                            <span style="pointer-events: none;">Character-level (CER)</span>
+                        </label>
+                    </div>
+                </div>
+                
+                {% for row in results %}
+                <div id="transcription-{{ loop.index }}" class="transcription-card" data-engine="{{ row.engine }}" data-degradation="{{ row.degradation }}" data-enhancement="{{ row.enhancement }}" data-normalization="{{ row.normalization }}">
+                    <div class="transcription-header">
+                        <h3>{{ row.dataset }} • {{ row.engine }}</h3>
+                        <div class="transcription-stats">
+                            <span><strong>Degradation:</strong> {{ row.degradation }}</span>
+                            <span><strong>Enhancement:</strong> {{ row.enhancement }}</span>
+                            <span><strong>Normalization:</strong> {{ row.normalization }}</span>
+                            <span><strong>WER:</strong> {{ "%.4f"|format(row.wer) if row.wer is not none else 'N/A' }}</span>
+                            <span><strong>CER:</strong> {{ "%.4f"|format(row.cer) if row.cer is not none else 'N/A' }}</span>
+                            <span><strong>Time:</strong> {{ "%.2f"|format(row.time_s) }}s</span>
+                        </div>
+                    </div>
+                    <div class="transcription-body">
+                        <div class="transcription-col">
+                            <div class="col-header">Reference</div>
+                            <div class="text-content diff-words">{{ row.reference_text_words|safe }}</div>
+                            <div class="text-content diff-chars" style="display: none;">{{ row.reference_text_chars|safe }}</div>
+                        </div>
+                        <div class="transcription-col">
+                            <div class="col-header">Transcription</div>
+                            <div class="text-content diff-words">{{ row.transcribed_text_words|safe }}</div>
+                            <div class="text-content diff-chars" style="display: none;">{{ row.transcribed_text_chars|safe }}</div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </section>
+
+            <!-- Summary Table -->
+            <section>
+                <h2>Results Summary</h2>
+                <div class="table-wrapper">
+                    <table id="summary-table">
+                        <thead>
+                            <tr>
+                                <th onclick="sortTable(0)">Dataset</th>
+                                <th onclick="sortTable(1)">Engine</th>
+                                <th onclick="sortTable(2)">Language</th>
+                                <th onclick="sortTable(3)">Degradation</th>
+                                <th onclick="sortTable(4)">Enhancement</th>
+                                <th onclick="sortTable(5)">Normalization</th>
+                                <th onclick="sortTable(6, true)" style="text-align: right" title="Word Error Rate">WER</th>
+                                <th onclick="sortTable(7, true)" style="text-align: right" title="Character Error Rate">CER</th>
+                                <th onclick="sortTable(8, true)" style="text-align: right" title="Match Error Rate">MER</th>
+                                <th onclick="sortTable(9, true)" style="text-align: right" title="Word Information Lost">WIL</th>
+                                <th onclick="sortTable(10, true)" style="text-align: right" title="Word Information Preserved">WIP</th>
+                                <th onclick="sortTable(11, true)" style="text-align: right">Time (s)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in results %}
+                            <tr data-engine="{{ row.engine }}" data-degradation="{{ row.degradation }}" data-enhancement="{{ row.enhancement }}" data-normalization="{{ row.normalization }}"
+                                data-wer="{{ row.wer if row.wer is not none else '' }}"
+                                data-cer="{{ row.cer if row.cer is not none else '' }}"
+                                data-mer="{{ row.mer if row.mer is not none else '' }}"
+                                data-wil="{{ row.wil if row.wil is not none else '' }}"
+                                data-wip="{{ row.wip if row.wip is not none else '' }}">
+                                <td><a href="#transcription-{{ loop.index }}" style="color: var(--accent-color); text-decoration: none;">{{ row.dataset }}</a></td>
+                                <td>{{ row.engine }}</td>
+                                <td>{{ row.language|upper }}</td>
+                                <td>{{ row.degradation }}</td>
+                                <td>{{ row.enhancement }}</td>
+                                <td>{{ row.normalization }}</td>
+                                <td class="number" style="font-weight: bold;">{{ "%.4f"|format(row.wer) if row.wer is not none else 'N/A' }}</td>
+                                <td class="number">{{ "%.4f"|format(row.cer) if row.cer is not none else 'N/A' }}</td>
+                                <td class="number">{{ "%.4f"|format(row.mer) if row.mer is not none else 'N/A' }}</td>
+                                <td class="number">{{ "%.4f"|format(row.wil) if row.wil is not none else 'N/A' }}</td>
+                                <td class="number">{{ "%.4f"|format(row.wip) if row.wip is not none else 'N/A' }}</td>
+                                <td class="number">{{ "%.2f"|format(row.time_s) if row.time_s is not none else 'N/A' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <footer>
+            Generated by ASR.lab
+        </footer>
+    </div>
+
+    <script>
+        // Custom multi-select dropdown and Plotly filtering
+        (function() {
+            function setupDropdown(buttonId, listId) {
+                const button = document.getElementById(buttonId);
+                const list = document.getElementById(listId);
+
+                button.addEventListener('click', () => {
+                    list.style.display = list.style.display === 'block' ? 'none' : 'block';
+                });
+
+                // Close dropdown if clicking outside
+                document.addEventListener('click', (event) => {
+                    if (!button.contains(event.target) && !list.contains(event.target)) {
+                        list.style.display = 'none';
+                    }
+                });
+
+                // Add select/deselect all functionality
+                list.querySelectorAll('.select-all-buttons button').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation(); // Prevent dropdown from closing
+                        const action = e.target.dataset.action;
+                        const checkboxes = list.querySelectorAll('input[type="checkbox"]');
+                        checkboxes.forEach(cb => {
+                            cb.checked = (action === 'select-all');
+                        });
+                        // Trigger change event on the first checkbox to update the plot
+                        if (checkboxes.length > 0) {
+                            checkboxes[0].dispatchEvent(new Event('change'));
+                        }
+                    });
+                });
+            }
+
+            setupDropdown('engine-select-button', 'engine-filters');
+            setupDropdown('degradation-select-button', 'degradation-filters');
+            setupDropdown('enhancement-select-button', 'enhancement-filters');
+            setupDropdown('normalization-select-button', 'normalization-filters');
+
+            // Wait for Plotly to be available
+            const checkPlotly = setInterval(function() {
+                if (window.Plotly) {
+                    clearInterval(checkPlotly);
+                    initializeFilters();
+                }
+            }, 100);
+
+            function initializeFilters() {
+                const chartDiv = document.getElementById('plotly-chart');
+                const engineCheckboxes = document.querySelectorAll('#engine-filters input[type="checkbox"]');
+                const degradationCheckboxes = document.querySelectorAll('#degradation-filters input[type="checkbox"]');
+                const enhancementCheckboxes = document.querySelectorAll('#enhancement-filters input[type="checkbox"]');
+                const normalizationCheckboxes = document.querySelectorAll('#normalization-filters input[type="checkbox"]');
+                
+                // Elements to filter
+                const tableRows = document.querySelectorAll('#summary-table tbody tr');
+                const transcriptionCards = document.querySelectorAll('.transcription-card');
+
+                function updatePlotVisibility() {
+                    const selectedEngines = Array.from(engineCheckboxes)
+                        .filter(cb => cb.checked)
+                        .map(cb => cb.value);
+                    
+                    const selectedDegradations = Array.from(degradationCheckboxes)
+                        .filter(cb => cb.checked)
+                        .map(cb => cb.value);
+
+                    const selectedEnhancements = Array.from(enhancementCheckboxes)
+                        .filter(cb => cb.checked)
+                        .map(cb => cb.value);
+
+                    const selectedNormalizations = Array.from(normalizationCheckboxes)
+                        .filter(cb => cb.checked)
+                        .map(cb => cb.value);
+
+                    // 1. Update Plotly Chart
+                    if (chartDiv && chartDiv.data) {
+                        const visibility = chartDiv.data.map(trace => {
+                            // Use customdata if available for robust filtering
+                            // customdata format: [engine, degradation, enhancement, normalization, dataset]
+                            if (trace.customdata && trace.customdata.length > 0) {
+                                const data = trace.customdata[0];
+                                const engine = data[0];
+                                const degradation = data[1];
+                                const enhancement = data[2];
+                                const normalization = data[3];
+
+                                const enhancementOptions = Array.from(enhancementCheckboxes).map(cb => cb.value);
+                                const normalizationOptions = Array.from(normalizationCheckboxes).map(cb => cb.value);
+
+                                const isEngineVisible = selectedEngines.includes(engine);
+                                const isDegradationVisible = selectedDegradations.includes(degradation);
+                                
+                                const isEnhancementVisible = selectedEnhancements.includes(enhancement) || 
+                                                            (enhancement === "None" && !enhancementOptions.includes("None"));
+                                                            
+                                const isNormalizationVisible = selectedNormalizations.includes(normalization) || 
+                                                              (normalization === "None" && !normalizationOptions.includes("None"));
+
+                                return isEngineVisible && isDegradationVisible && isEnhancementVisible && isNormalizationVisible;
+                            }
+
+                            // Fallback to name parsing if customdata is missing (legacy support)
+                            const traceName = trace.name || '';
+                            // Trace name format: "Engine (Degradation + Enhancement + Normalization)"
+                            const parts = traceName.split(' (');
+                            if (parts.length < 2) return false;
+                            
+                            const engine = parts[0];
+                            const condition = parts[1].slice(0, -1); // Remove closing parenthesis
+                            
+                            const condParts = condition.split(' + ');
+                            let degradation = condParts[0];
+                            let enhancement = "None";
+                            let normalization = "None";
+                            
+                            // Helper to check if a value is in a list of checkboxes
+                            const isEnhancement = (val) => Array.from(enhancementCheckboxes).some(cb => cb.value === val);
+                            const isNormalization = (val) => Array.from(normalizationCheckboxes).some(cb => cb.value === val);
+
+                            for (let i = 1; i < condParts.length; i++) {
+                                const part = condParts[i];
+                                if (isEnhancement(part)) {
+                                    enhancement = part;
+                                } else if (isNormalization(part)) {
+                                    normalization = part;
+                                }
+                            }
+
+                            // Check visibility
+                            // If "None" is not an option in the checkboxes, treat it as visible (not applicable)
+                            const enhancementOptions = Array.from(enhancementCheckboxes).map(cb => cb.value);
+                            const normalizationOptions = Array.from(normalizationCheckboxes).map(cb => cb.value);
+
+                            const isEngineVisible = selectedEngines.includes(engine);
+                            const isDegradationVisible = selectedDegradations.includes(degradation);
+                            
+                            const isEnhancementVisible = selectedEnhancements.includes(enhancement) || 
+                                                        (enhancement === "None" && !enhancementOptions.includes("None"));
+                                                        
+                            const isNormalizationVisible = selectedNormalizations.includes(normalization) || 
+                                                          (normalization === "None" && !normalizationOptions.includes("None"));
+
+                            return isEngineVisible && isDegradationVisible && isEnhancementVisible && isNormalizationVisible;
+                        });
+                        Plotly.restyle(chartDiv, { visible: visibility });
+                    }
+                    
+                    // 2. Update Table Rows
+                    tableRows.forEach(row => {
+                        const engine = row.dataset.engine;
+                        const degradation = row.dataset.degradation;
+                        const enhancement = row.dataset.enhancement || "None";
+                        const normalization = row.dataset.normalization || "None";
+                        
+                        const enhancementOptions = Array.from(enhancementCheckboxes).map(cb => cb.value);
+                        const normalizationOptions = Array.from(normalizationCheckboxes).map(cb => cb.value);
+
+                        const isEngineVisible = selectedEngines.includes(engine);
+                        const isDegradationVisible = selectedDegradations.includes(degradation);
+                        
+                        const isEnhancementVisible = selectedEnhancements.includes(enhancement) || 
+                                                    (enhancement === "None" && !enhancementOptions.includes("None"));
+                                                    
+                        const isNormalizationVisible = selectedNormalizations.includes(normalization) || 
+                                                      (normalization === "None" && !normalizationOptions.includes("None"));
+                        
+                        if (isEngineVisible && isDegradationVisible && isEnhancementVisible && isNormalizationVisible) {
+                            row.style.display = '';
+                        } else {
+                            row.style.display = 'none';
+                        }
+                    });
+
+                    // 3. Update Transcription Cards
+                    transcriptionCards.forEach(card => {
+                        const engine = card.dataset.engine;
+                        const degradation = card.dataset.degradation;
+                        const enhancement = card.dataset.enhancement || "None";
+                        const normalization = card.dataset.normalization || "None";
+                        
+                        const enhancementOptions = Array.from(enhancementCheckboxes).map(cb => cb.value);
+                        const normalizationOptions = Array.from(normalizationCheckboxes).map(cb => cb.value);
+
+                        const isEngineVisible = selectedEngines.includes(engine);
+                        const isDegradationVisible = selectedDegradations.includes(degradation);
+                        
+                        const isEnhancementVisible = selectedEnhancements.includes(enhancement) || 
+                                                    (enhancement === "None" && !enhancementOptions.includes("None"));
+                                                    
+                        const isNormalizationVisible = selectedNormalizations.includes(normalization) || 
+                                                      (normalization === "None" && !normalizationOptions.includes("None"));
+                        
+                        if (isEngineVisible && isDegradationVisible && isEnhancementVisible && isNormalizationVisible) {
+                            card.style.display = '';
+                        } else {
+                            card.style.display = 'none';
+                        }
+                    });
+
+                    // 4. Update metrics comparison chart
+                    if (window.updateMetricsComparisonChart) {
+                        window.updateMetricsComparisonChart();
+                    }
+                }
+
+                engineCheckboxes.forEach(cb => cb.addEventListener('change', updatePlotVisibility));
+                degradationCheckboxes.forEach(cb => cb.addEventListener('change', updatePlotVisibility));
+                enhancementCheckboxes.forEach(cb => cb.addEventListener('change', updatePlotVisibility));
+                normalizationCheckboxes.forEach(cb => cb.addEventListener('change', updatePlotVisibility));
+
+                // Pre-cache all metric data from traces for FAST switching
+                let cachedMetricData = null;
+                if (chartDiv && chartDiv.data) {
+                    cachedMetricData = chartDiv.data.map((trace) => {
+                        if (trace.customdata && trace.customdata.length > 0) {
+                            return {
+                                wer: trace.customdata.map(d => d[5]),
+                                cer: trace.customdata.map(d => d[6]),
+                                mer: trace.customdata.map(d => d[7]),
+                                wil: trace.customdata.map(d => d[8]),
+                                wip: trace.customdata.map(d => d[9])
+                            };
+                        }
+                        return null;
+                    });
+                }
+
+                // Metric radio buttons for chart (FAST version with batch update)
+                const metricRadios = document.querySelectorAll('#metric-radios input[type="radio"]');
+                const metricNames = {
+                    'wer': 'Word Error Rate (WER)',
+                    'cer': 'Character Error Rate (CER)',
+                    'mer': 'Match Error Rate (MER)',
+                    'wil': 'Word Information Lost (WIL)',
+                    'wip': 'Word Information Preserved (WIP)'
+                };
+
+                function updateChartMetric() {
+                    const selectedMetric = document.querySelector('#metric-radios input[type="radio"]:checked').value;
+                    const metricName = metricNames[selectedMetric];
+                    
+                    if (chartDiv && chartDiv.data && cachedMetricData) {
+                        // Batch update: collect all Y values first
+                        const indicesToUpdate = [];
+                        const yValues = [];
+                        
+                        cachedMetricData.forEach((data, idx) => {
+                            if (data !== null) {
+                                indicesToUpdate.push(idx);
+                                yValues.push(data[selectedMetric]);
+                            }
+                        });
+                        
+                        // Single batch restyle call - MUCH faster than loop
+                        if (indicesToUpdate.length > 0) {
+                            Plotly.restyle(chartDiv, { y: yValues }, indicesToUpdate);
+                        }
+                        
+                        // Update Y-axis titles
+                        const layoutUpdate = {};
+                        const numAxes = Object.keys(chartDiv.layout).filter(k => k.startsWith('yaxis')).length;
+                        layoutUpdate['yaxis.title.text'] = metricName;
+                        for (let i = 2; i <= numAxes + 1; i++) {
+                            layoutUpdate[`yaxis${i}.title.text`] = metricName;
+                        }
+                        Plotly.relayout(chartDiv, layoutUpdate);
+                    }
+                    
+                    // Auto-select diff view based on metric (CER → chars, others → words)
+                    const diffViewRadios = document.querySelectorAll('#diff-view-radios input[type="radio"]');
+                    if (selectedMetric === 'cer') {
+                        diffViewRadios.forEach(r => r.checked = (r.value === 'chars'));
+                    } else {
+                        diffViewRadios.forEach(r => r.checked = (r.value === 'words'));
+                    }
+                    updateDiffView();
+                }
+
+                metricRadios.forEach(radio => radio.addEventListener('change', updateChartMetric));
+
+                // Diff view radio buttons
+                const diffViewRadios = document.querySelectorAll('#diff-view-radios input[type="radio"]');
+                
+                function updateDiffView() {
+                    const selectedView = document.querySelector('#diff-view-radios input[type="radio"]:checked').value;
+                    const wordDiffs = document.querySelectorAll('.diff-words');
+                    const charDiffs = document.querySelectorAll('.diff-chars');
+                    
+                    if (selectedView === 'words') {
+                        wordDiffs.forEach(el => el.style.display = '');
+                        charDiffs.forEach(el => el.style.display = 'none');
+                    } else {
+                        wordDiffs.forEach(el => el.style.display = 'none');
+                        charDiffs.forEach(el => el.style.display = '');
+                    }
+                }
+
+                diffViewRadios.forEach(radio => radio.addEventListener('change', updateDiffView));
+
+                // Create metrics visualization charts
+                createMetricsHeatmap();
+            }
+
+            function createMetricsHeatmap() {
+                const tableRows = document.querySelectorAll('#summary-table tbody tr');
+                const chartDiv = document.getElementById('metrics-heatmap');
+                
+                // Collect all visible data
+                const data = [];
+                tableRows.forEach(row => {
+                    if (row.style.display === 'none') return;
+                    
+                    const label = `${row.dataset.engine} | ${row.dataset.degradation} | ${row.dataset.enhancement || 'None'} | ${row.dataset.normalization || 'None'}`;
+                    data.push({
+                        label: label,
+                        engine: row.dataset.engine,
+                        wer: parseFloat(row.dataset.wer) || null,
+                        cer: parseFloat(row.dataset.cer) || null,
+                        mer: parseFloat(row.dataset.mer) || null,
+                        wil: parseFloat(row.dataset.wil) || null,
+                        wip: parseFloat(row.dataset.wip) || null
+                    });
+                });
+
+                if (data.length === 0) {
+                    Plotly.purge(chartDiv);
+                    chartDiv.innerHTML = '<p style="text-align:center; padding: 2rem; color: #888;">No data to display</p>';
+                    return;
+                }
+
+                // Sort by WER by default
+                data.sort((a, b) => (a.wer || 1) - (b.wer || 1));
+
+                const labels = data.map(d => d.label);
+                const metrics = ['wer', 'cer', 'mer', 'wil', 'wip'];
+                const metricLabels = ['WER', 'CER', 'MER', 'WIL', 'WIP'];
+                
+                // Build z matrix (rows = combinations, cols = metrics)
+                // For WIP: invert color scale (higher is better)
+                const z = data.map(d => [
+                    d.wer, d.cer, d.mer, d.wil, 
+                    d.wip !== null ? 1 - d.wip : null  // Invert WIP for color
+                ]);
+                
+                // Custom hover text showing actual values
+                const hovertext = data.map(d => [
+                    `WER: ${d.wer?.toFixed(4) || 'N/A'}`,
+                    `CER: ${d.cer?.toFixed(4) || 'N/A'}`,
+                    `MER: ${d.mer?.toFixed(4) || 'N/A'}`,
+                    `WIL: ${d.wil?.toFixed(4) || 'N/A'}`,
+                    `WIP: ${d.wip?.toFixed(4) || 'N/A'}`
+                ]);
+
+                const trace = {
+                    z: z,
+                    x: metricLabels,
+                    y: labels,
+                    type: 'heatmap',
+                    colorscale: [[0, '#27ae60'], [0.15, '#2ecc71'], [0.3, '#f1c40f'], [0.5, '#e67e22'], [0.75, '#e74c3c'], [1, '#c0392b']],
+                    zmin: 0,
+                    zmax: 1,
+                    hovertext: hovertext,
+                    hoverinfo: 'text+y',
+                    showscale: true,
+                    colorbar: {
+                        title: 'Error Rate',
+                        tickvals: [0, 0.25, 0.5, 0.75, 1],
+                        ticktext: ['0 (Best)', '0.25', '0.5', '0.75', '1 (Worst)']
+                    }
+                };
+
+                const layout = {
+                    margin: { l: 300, r: 50, t: 30, b: 50 },
+                    xaxis: { side: 'top', tickangle: 0 },
+                    yaxis: { autorange: 'reversed', tickfont: { size: 10 } },
+                    height: Math.min(800, Math.max(300, data.length * 20 + 80))
+                };
+
+                Plotly.newPlot(chartDiv, [trace], layout, { responsive: true });
+            }
+
+            // Update heatmap when filters change
+            window.updateMetricsComparisonChart = function() {
+                createMetricsHeatmap();
+            };
+        })();
+
+        function sortTable(n, isNumber) {
+            var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
+            table = document.getElementById("summary-table");
+            switching = true;
+            dir = "asc";
+            while (switching) {
+                switching = false;
+                rows = table.rows;
+                for (i = 1; i < (rows.length - 1); i++) {
+                    shouldSwitch = false;
+                    x = rows[i].getElementsByTagName("TD")[n];
+                    y = rows[i + 1].getElementsByTagName("TD")[n];
+                    var xContent = x.innerText || x.textContent;
+                    var yContent = y.innerText || y.textContent;
+                    if (isNumber) {
+                        xContent = parseFloat(xContent.replace('%', ''));
+                        yContent = parseFloat(yContent.replace('%', ''));
+                    } else {
+                        xContent = xContent.toLowerCase();
+                        yContent = yContent.toLowerCase();
+                    }
+                    if (dir == "asc") {
+                        if (xContent > yContent) { shouldSwitch = true; break; }
+                    } else if (dir == "desc") {
+                        if (xContent < yContent) { shouldSwitch = true; break; }
+                    }
+                }
+                if (shouldSwitch) {
+                    rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                    switching = true;
+                    switchcount++;
+                } else {
+                    if (switchcount == 0 && dir == "asc") {
+                        dir = "desc";
+                        switching = true;
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>

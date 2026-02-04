@@ -1,18 +1,20 @@
 import time
 import json
+import numpy as np
 from pathlib import Path
 from typing import Dict, Any
-import wave
 
 from .base import ASREngine
+from ..core.models import EngineConfig, TranscriptionResult
+from ..audio.loader import load_audio
 
 
 class VoskEngine(ASREngine):
     """ASR engine for Vosk (offline speech recognition)."""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: EngineConfig):
         super().__init__(config)
-        self.model_path = self.config.get("model_path")
+        self.model_path = getattr(self.config, "model_path", None)
         if not self.model_path:
             raise ValueError("VoskEngine requires 'model_path'")
         
@@ -30,39 +32,41 @@ class VoskEngine(ASREngine):
             self.model = Model(self.model_path)
             self.recognizer = KaldiRecognizer
 
-    def transcribe(self, audio_path: Path, language: str) -> Dict[str, Any]:
+    def transcribe(self, audio_path: Path, language: str) -> TranscriptionResult:
         """Transcribes audio using Vosk."""
         if self.model is None:
             self.load_model()
 
         start_time = time.time()
         
-        wf = wave.open(str(audio_path), "rb")
-        if wf.getnchannels() != 1 or wf.getsampwidth() != 2 or wf.getframerate() not in [8000, 16000, 32000, 48000]:
-            raise ValueError("Audio must be WAV mono PCM")
+        # Load audio (Vosk typically works best with 16kHz)
+        audio_data, sr = load_audio(audio_path, target_sr=16000)
         
-        rec = self.recognizer(self.model, wf.getframerate())
+        # Convert float32 to int16 PCM
+        audio_int16 = (audio_data * 32768).astype(np.int16)
+        
+        rec = self.recognizer(self.model, sr)
         rec.SetWords(True)
         
         results = []
-        while True:
-            data = wf.readframes(4000)
-            if len(data) == 0:
-                break
+        
+        # Process in chunks (e.g. 4000 samples)
+        chunk_size = 4000
+        for i in range(0, len(audio_int16), chunk_size):
+            data = audio_int16[i:i+chunk_size].tobytes()
             if rec.AcceptWaveform(data):
                 results.append(json.loads(rec.Result()))
         
         results.append(json.loads(rec.FinalResult()))
-        wf.close()
         
         elapsed = time.time() - start_time
         text = " ".join([r.get("text", "") for r in results]).strip()
 
-        return {
-            "text": text,
-            "processing_time": elapsed,
-            "confidence": None
-        }
+        return TranscriptionResult(
+            text=text,
+            processing_time=elapsed,
+            confidence=None
+        )
 
     def get_metadata(self) -> Dict[str, Any]:
         """Returns model metadata."""

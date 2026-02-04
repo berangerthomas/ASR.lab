@@ -2,30 +2,32 @@ import yaml
 from pathlib import Path
 from typing import Dict, Any
 
+from ..core.models import BenchmarkConfig
+
 class ConfigLoader:
     """
-    Handles loading and validation of benchmark configuration files.
+    Handles loading and validation of benchmark configuration files using Pydantic.
     """
 
     def __init__(self, config_path: Path):
         self.config_path = config_path
-        self.config = self._load_config()
+        self.config: BenchmarkConfig = self._load_config()
 
-    def _load_config(self) -> Dict[str, Any]:
-        """Loads the YAML configuration file."""
+    def _load_config(self) -> BenchmarkConfig:
+        """Loads and validates the YAML configuration file."""
         if not self.config_path.is_file():
             raise FileNotFoundError(f"Configuration file not found at: {self.config_path}")
         
         with open(self.config_path, 'r') as f:
             try:
-                return yaml.safe_load(f)
+                raw_config = yaml.safe_load(f)
+                return BenchmarkConfig(**raw_config)
             except yaml.YAMLError as e:
                 raise ValueError(f"Error parsing YAML file: {e}")
+            except Exception as e:
+                raise ValueError(f"Configuration validation failed: {e}")
 
-    def get_section(self, section_name: str) -> Dict[str, Any]:
-        """Returns a specific section of the configuration."""
-        return self.config.get(section_name, {})
+    def get_config(self) -> BenchmarkConfig:
+        """Returns the validated configuration object."""
+        return self.config
 
-    def get_parameter(self, section_name: str, param_name: str, default: Any = None) -> Any:
-        """Returns a specific parameter from a section."""
-        return self.get_section(section_name).get(param_name, default)

@@ -49,9 +49,23 @@ class ReportGenerator:
         """Prepares the results data for easy rendering in the template."""
         prepared = []
         for res in self.results:
-            language = res["dataset"].split('_')[0]
-            is_pristine = "original" in res["dataset"]
-            degradation = "original" if is_pristine else res["dataset"].split("degraded_")[-1]
+            language = res.get("language") or res["dataset"].split('_')[0]
+            degradation = res.get("degradation")
+            enhancement = res.get("enhancement", "None")
+            normalization = res.get("normalization")
+            if not normalization:
+                # Fallback: try to parse from dataset name
+                dataset_name = res["dataset"]
+                if dataset_name.endswith("norm_minus_18"):
+                    normalization = "norm_minus_18"
+                elif dataset_name.endswith("no_norm"):
+                    normalization = "no_norm"
+                else:
+                    normalization = "None"
+            
+            if not degradation:
+                is_pristine = "original" in res["dataset"]
+                degradation = "original" if is_pristine else res["dataset"].split("degraded_")[-1]
 
             # Get WER value (try both lowercase and uppercase for backward compatibility)
             wer_value = res["metrics"].get("wer") or res["metrics"].get("WER")
@@ -61,6 +75,8 @@ class ReportGenerator:
                 "engine": res["engine"],
                 "language": language,
                 "degradation": degradation,
+                "enhancement": enhancement,
+                "normalization": normalization,
                 "wer": wer_value,
                 "time_s": res["transcription"]["processing_time"],
                 "transcription": res["transcription"],

@@ -7,16 +7,17 @@ from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 import librosa
 
 from .base import ASREngine
+from ..core.models import EngineConfig, TranscriptionResult
 
 
 class Wav2Vec2Engine(ASREngine):
     """ASR engine for Meta's Wav2Vec2 models."""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: EngineConfig):
         super().__init__(config)
-        self.model_id = self.config.get("model_id")
+        self.model_id = getattr(self.config, "model_id", None) or self.config.model_name
         if not self.model_id:
-            raise ValueError("Wav2Vec2Engine requires 'model_id'")
+            raise ValueError("Wav2Vec2Engine requires 'model_id' or 'model_name'")
         
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = None
@@ -29,7 +30,7 @@ class Wav2Vec2Engine(ASREngine):
             self.model = Wav2Vec2ForCTC.from_pretrained(self.model_id).to(self.device)
             self.model.eval()
 
-    def transcribe(self, audio_path: Path, language: str) -> Dict[str, Any]:
+    def transcribe(self, audio_path: Path, language: str) -> TranscriptionResult:
         """Transcribes audio using Wav2Vec2."""
         if self.model is None:
             self.load_model()
@@ -47,11 +48,11 @@ class Wav2Vec2Engine(ASREngine):
         
         elapsed = time.time() - start_time
 
-        return {
-            "text": text,
-            "processing_time": elapsed,
-            "confidence": None
-        }
+        return TranscriptionResult(
+            text=text,
+            processing_time=elapsed,
+            confidence=None
+        )
 
     def get_metadata(self) -> Dict[str, Any]:
         """Returns model metadata."""

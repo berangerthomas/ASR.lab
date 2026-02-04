@@ -1,6 +1,13 @@
 from ..metrics.wer import WER
+from ..metrics.cer import CER
+from ..metrics.mer import MER
+from ..metrics.wil import WIL
+from ..metrics.wip import WIP
 
 METRIC_REGISTRY = {
     "wer": WER,
-    # Other metrics like cer, mer, etc., will be added here.
+    "cer": CER,
+    "mer": MER,
+    "wil": WIL,
+    "wip": WIP,
 }

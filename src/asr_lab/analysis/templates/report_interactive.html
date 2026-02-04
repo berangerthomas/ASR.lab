@@ -3,454 +3,1096 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ASR Benchmark Report - Interactive</title>
+    <title>ASR Benchmark Report</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #34495e;
+            --accent-color: #3498db;
+            --bg-color: #f8f9fa;
+            --text-color: #333;
+            --border-color: #e9ecef;
+            --success-bg: #d4edda;
+            --success-text: #155724;
+            --danger-bg: #f8d7da;
+            --danger-text: #721c24;
+        }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; line-height: 1.6; }
-        .container { max-width: 1600px; margin: 0 auto; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 2em; text-align: center; }
-        header h1 { font-size: 2.5em; margin-bottom: 0.3em; font-weight: 300; }
-        header .subtitle { opacity: 0.9; font-size: 1.1em; }
-        header .meta-info { 
+        body { font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: var(--bg-color); color: var(--text-color); line-height: 1.5; font-size: 14px; }
+        .container { max-width: 100%; margin: 0; background: white; min-height: 100vh; }
+        
+        /* Header */
+        header { background: var(--primary-color); color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        header h1 { font-size: 1.5rem; font-weight: 600; margin: 0; }
+        header .meta-info { display: flex; gap: 2rem; font-size: 0.9rem; opacity: 0.9; }
+        header .meta-info div { display: flex; align-items: center; gap: 0.5rem; }
+        
+        /* Global Filters Bar */
+        .filters-bar { 
             display: flex; 
-            justify-content: center; 
-            gap: 2em; 
-            margin-top: 1.5em; 
-            font-size: 0.9em; 
-            opacity: 0.95;
+            gap: 1rem; 
+            padding: 1rem 2rem; 
+            background: white; 
+            border-bottom: 1px solid var(--border-color); 
+            align-items: flex-end;
             flex-wrap: wrap;
         }
-        header .meta-info > div { 
-            display: flex; 
-            align-items: center; 
-            gap: 0.5em;
-        }
-        header .meta-info strong { 
-            font-weight: 600; 
-            opacity: 0.8;
-        }
-        .content { padding: 2em; }
-        section { margin-bottom: 3em; }
-        h2 { color: #667eea; border-bottom: 3px solid #667eea; padding-bottom: 0.5em; margin-bottom: 1em; font-weight: 400; }
-        h3 { color: #555; margin: 1.5em 0 0.5em; font-weight: 500; }
+        .custom-select { position: relative; min-width: 180px; }
+        .custom-select > label { display: block; font-size: 0.8rem; color: var(--secondary-color); margin-bottom: 0.25rem; font-weight: 600; }
+        .select-button { width: 100%; padding: 0.5rem 0.75rem; background: white; border: 1px solid #ced4da; border-radius: 4px; cursor: pointer; text-align: left; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; }
+        .select-button:after { content: '▼'; font-size: 0.7rem; margin-left: 0.5rem; opacity: 0.6; }
+        .checkbox-list { display: none; position: absolute; top: 100%; left: 0; width: 100%; min-width: 200px; background: white; border: 1px solid #ced4da; border-radius: 0 0 4px 4px; z-index: 100; max-height: 250px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .checkbox-list.open { display: block; }
+        .checkbox-list label { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; cursor: pointer; font-size: 0.9rem; }
+        .checkbox-list label:hover { background: #f8f9fa; }
+        .select-all-buttons { display: flex; justify-content: space-between; padding: 0.5rem 0.75rem; border-bottom: 1px solid #e9ecef; background: #f8f9fa; }
+        .select-all-buttons button { background: none; border: none; color: var(--accent-color); cursor: pointer; font-size: 0.8rem; font-weight: 600; }
+        .select-all-buttons button:hover { text-decoration: underline; }
         
-        /* Tables */
-        table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 0.95em; }
-        th, td { border: 1px solid #ddd; padding: 0.8em; text-align: left; }
-        th { 
-            background: #667eea; 
-            color: white; 
-            font-weight: 500; 
-            position: sticky; 
-            top: 0;
+        /* Home Button */
+        .home-btn {
+            padding: 0.5rem 1rem;
+            background: var(--accent-color);
+            border: none;
+            border-radius: 4px;
+            color: white;
             cursor: pointer;
-            user-select: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+            transition: background 0.2s;
+        }
+        .home-btn:hover { background: #2980b9; }
+
+        /* Tab Navigation */
+        .tabs-container { padding: 0 2rem; }
+        .tabs-nav {
+            display: flex;
+            gap: 0;
+            background: #f1f3f5;
+            border-radius: 8px 8px 0 0;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            border-bottom: none;
+            margin-top: 1rem;
+        }
+        .tab-btn {
+            padding: 0.85rem 1.5rem;
+            background: transparent;
+            border: none;
+            color: var(--secondary-color);
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            border-bottom: 3px solid transparent;
             position: relative;
         }
-        th:hover { background: #5568d3; }
-        th.sortable::after {
-            content: ' ⇅';
-            opacity: 0.5;
-            font-size: 0.9em;
+        .tab-btn:hover { background: #e9ecef; color: var(--primary-color); }
+        .tab-btn.active {
+            background: white;
+            color: var(--accent-color);
+            border-bottom-color: var(--accent-color);
+            font-weight: 600;
         }
-        th.sort-asc::after {
-            content: ' ▲';
-            opacity: 1;
+        .tab-content {
+            display: none;
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 0 0 8px 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
         }
-        th.sort-desc::after {
-            content: ' ▼';
-            opacity: 1;
-        }
-        tr:nth-child(even) { background: #f9f9f9; }
-        tr:hover { background: #f0f0f0; }
-        td.number { text-align: right; font-family: 'Courier New', monospace; }
+        .tab-content.active { display: block; }
         
-        /* Plotly container */
-        .plotly-container { margin: 1.5em 0; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; }
+        /* Section Headers */
+        h2 { color: var(--primary-color); font-size: 1.2rem; border-bottom: 2px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1rem; font-weight: 600; }
+        h3 { color: var(--secondary-color); margin: 1rem 0 0.5rem; font-size: 1rem; font-weight: 600; }
+
+        /* Radio Button Group */
+        .metric-radio-group { display: flex; gap: 0.25rem; flex-wrap: wrap; }
+        .metric-radio-group label { 
+            padding: 0.4rem 0.75rem; 
+            background: white; 
+            border: 1px solid #ced4da; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-size: 0.85rem;
+            transition: all 0.15s ease;
+            user-select: none;
+        }
+        .metric-radio-group label:hover { background: #e9ecef; }
+        .metric-radio-group input[type="radio"] { display: none; }
+        .metric-radio-group label:has(input:checked) {
+            background: var(--accent-color); 
+            color: white; 
+            border-color: var(--accent-color);
+        }
         
-        /* Footer */
-        footer { background: #f8f9fa; padding: 1.5em; text-align: center; color: #666; font-size: 0.9em; border-top: 1px solid #ddd; }
+        /* Control Bars */
+        .control-bar { 
+            display: flex; 
+            align-items: center; 
+            gap: 1rem; 
+            margin-bottom: 1rem; 
+            padding: 0.75rem; 
+            background: #f8f9fa; 
+            border-radius: 4px; 
+            border: 1px solid var(--border-color);
+            flex-wrap: wrap;
+        }
+        .control-bar > label { font-weight: 600; color: var(--secondary-color); font-size: 0.9rem; }
+        
+        /* Box Plot Controls */
+        .boxplot-controls {
+            display: flex;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+        .control-group { display: flex; flex-direction: column; gap: 0.25rem; }
+        .control-group label { font-size: 0.8rem; color: var(--secondary-color); font-weight: 600; }
+        .control-group select {
+            padding: 0.5rem 0.75rem;
+            background: white;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            color: var(--text-color);
+            cursor: pointer;
+            font-size: 0.9rem;
+            min-width: 150px;
+        }
+        
+        /* Plotly containers */
+        .plotly-container { min-height: 500px; border: 1px solid var(--border-color); border-radius: 4px; }
+        .plotly-container-small { min-height: 350px; border: 1px solid var(--border-color); border-radius: 4px; }
+        
+        /* Tables */
+        .table-wrapper { overflow-x: auto; border: 1px solid var(--border-color); border-radius: 4px; }
+        table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+        th, td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+        th { background: #f1f3f5; color: var(--secondary-color); font-weight: 600; cursor: pointer; user-select: none; white-space: nowrap; }
+        th:hover { background: #e9ecef; }
+        tr:hover { background: #f8f9fa; }
+        td.number { text-align: right; font-family: 'Consolas', monospace; }
+        
+        /* CSV Download Button */
+        .csv-btn {
+            padding: 0.5rem 1rem;
+            background: #27ae60;
+            border: none;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: background 0.2s;
+        }
+        .csv-btn:hover { background: #219a52; }
+        
+        /* Diff Highlighting */
+        .diff-add { background-color: var(--success-bg); color: var(--success-text); padding: 1px 3px; border-radius: 2px; }
+        .diff-del { background-color: var(--danger-bg); color: var(--danger-text); padding: 1px 3px; border-radius: 2px; opacity: 0.8; }
+        
+        /* Transcription Cards */
+        .transcription-card { border: 1px solid var(--border-color); margin-bottom: 1rem; border-radius: 4px; overflow: hidden; }
+        .transcription-header { background: #f8f9fa; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+        .transcription-stats { font-size: 0.85rem; color: var(--secondary-color); display: flex; gap: 1rem; flex-wrap: wrap; }
+        .transcription-body { display: grid; grid-template-columns: 1fr 1fr; }
+        .transcription-col { padding: 1rem; }
+        .transcription-col:first-child { border-right: 1px solid var(--border-color); background: #fafbfc; }
+        .col-header { font-weight: 600; color: var(--secondary-color); margin-bottom: 0.5rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; }
+        .text-content { font-family: 'Georgia', serif; line-height: 1.6; font-size: 0.95rem; color: #2c3e50; }
+        
+        /* Help Tab */
+        .help-section { max-width: 900px; }
+        .help-section h3 { color: var(--primary-color); font-size: 1.1rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border-color); }
+        .metric-card { background: #f8f9fa; border: 1px solid var(--border-color); border-radius: 6px; padding: 1rem 1.25rem; margin-bottom: 1rem; }
+        .metric-card h4 { color: var(--accent-color); margin: 0 0 0.5rem 0; font-size: 1rem; }
+        .metric-card p { margin: 0.4rem 0; font-size: 0.9rem; line-height: 1.5; }
+        .metric-card .formula { font-family: 'Consolas', monospace; background: white; padding: 0.5rem 0.75rem; border-radius: 4px; border: 1px solid var(--border-color); margin: 0.75rem 0; font-size: 0.85rem; }
+        .metric-card ul { font-size: 0.9rem; line-height: 1.6; }
+        .metric-header { cursor: help; }
+        
+        footer { text-align: center; padding: 1.5rem; color: #6c757d; font-size: 0.85rem; border-top: 1px solid var(--border-color); margin-top: 1rem; }
         
         /* Responsive */
         @media (max-width: 768px) {
-            .content { padding: 1em; }
-            header h1 { font-size: 1.8em; }
-            header .meta-info { font-size: 0.8em; gap: 1em; }
-            table { font-size: 0.85em; }
-            th, td { padding: 0.5em; }
-            
-            /* Stack transcription columns on mobile */
-            section > div > div[style*="display: flex"] {
-                display: block !important;
-            }
-            section > div > div[style*="display: flex"] > div {
-                margin-bottom: 1em;
-            }
+            header { flex-direction: column; gap: 1rem; text-align: center; }
+            .transcription-body { grid-template-columns: 1fr; }
+            .transcription-col:first-child { border-right: none; border-bottom: 1px solid var(--border-color); }
+            .filters-bar { flex-direction: column; align-items: stretch; }
+            .tabs-nav { flex-wrap: wrap; }
         }
-        
-        /* Scrollable table wrapper */
-        .table-wrapper { overflow-x: auto; }
-
-        /* Custom multi-select dropdown */
-        .filters {
-            display: flex;
-            gap: 1em;
-            margin-bottom: 1.5em;
-            flex-wrap: wrap;
-        }
-        .custom-select {
-            position: relative;
-            width: 250px;
-        }
-        .select-button {
-            width: 100%;
-            padding: 0.8em 1em;
-            background: white;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            cursor: pointer;
-            text-align: left;
-            font-size: 0.9em;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .select-button:after {
-            content: '▼';
-            font-size: 0.8em;
-        }
-        .checkbox-list {
-            display: none;
-            position: absolute;
-            top: 100%;
-            left: 0;
-            width: 100%;
-            background: white;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            z-index: 10;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        .checkbox-list label {
-            display: block;
-            padding: 0.5em 1em;
-            cursor: pointer;
-        }
-        .checkbox-list label:hover {
-            background: #f0f0f0;
-        }
-        .checkbox-list input {
-            margin-right: 0.5em;
-        }
-        .select-all-buttons {
-            display: flex;
-            justify-content: space-around;
-            padding: 0.5em 0;
-            border-bottom: 1px solid #ccc;
-        }
-        .select-all-buttons button {
-            background: none;
-            border: none;
-            color: #667eea;
-            cursor: pointer;
-            font-size: 0.9em;
-        }
-        .select-all-buttons button:hover {
-            text-decoration: underline;
-        }
-        .diff-add { background-color: #d4edda; color: #155724; padding: 2px 4px; border-radius: 3px; }
-        .diff-del { background-color: #f8d7da; color: #721c24; padding: 2px 4px; border-radius: 3px; }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>🎙️ ASR Benchmark Report</h1>
-            <p class="subtitle">Interactive Analysis Dashboard</p>
+            <h1>ASR Benchmark Report</h1>
             <div class="meta-info">
-                <div>
-                    <span>📅</span>
-                    <span><strong>Generated:</strong> {{ generation_date }}</span>
-                </div>
-                <div>
-                    <span>🔬</span>
-                    <span><strong>Experiments:</strong> {{ results|length }}</span>
-                </div>
-                <div>
-                    <span>🤖</span>
-                    <span><strong>Engines:</strong> {{ engines|join(', ') }}</span>
-                </div>
-                <div>
-                    <span>🌍</span>
-                    <span><strong>Languages:</strong> {{ languages|join(', ') }}</span>
-                </div>
+                <div><strong>Date:</strong> {{ generation_date }}</div>
+                <div><strong>Experiments:</strong> {{ results|length }}</div>
+                <div><strong>Engines:</strong> {{ engines|length }}</div>
             </div>
         </header>
 
-        <div class="content">
-            <!-- Interactive Dashboard -->
-            <section>
-                <h2>📊 Interactive Dashboard</h2>
-                
-                <!-- Filters -->
-                <div class="filters">
-                    <div class="custom-select">
-                        <button class="select-button" id="engine-select-button">Engines</button>
-                        <div class="checkbox-list" id="engine-filters">
-                            <div class="select-all-buttons">
-                                <button data-action="select-all">Select All</button>
-                                <button data-action="deselect-all">Deselect All</button>
-                            </div>
-                            {% for engine in engines %}
-                            <label>
-                                <input type="checkbox" value="{{ engine }}" checked> {{ engine }}
-                            </label>
-                            {% endfor %}
-                        </div>
+        <!-- Global Filters Bar -->
+        <div class="filters-bar">
+            <div class="custom-select">
+                <label>Engines</label>
+                <button class="select-button" id="engine-select-button">All Engines</button>
+                <div class="checkbox-list" id="engine-filters">
+                    <div class="select-all-buttons">
+                        <button data-action="select-all">Select All</button>
+                        <button data-action="deselect-all">Deselect All</button>
                     </div>
-                    <div class="custom-select">
-                        <button class="select-button" id="degradation-select-button">Degradation Types</button>
-                        <div class="checkbox-list" id="degradation-filters">
-                            <div class="select-all-buttons">
-                                <button data-action="select-all">Select All</button>
-                                <button data-action="deselect-all">Deselect All</button>
-                            </div>
-                            {% for degradation in degradations %}
-                            <label>
-                                <input type="checkbox" value="{{ degradation }}" checked> {{ degradation|capitalize }}
-                            </label>
-                            {% endfor %}
-                        </div>
+                    {% for engine in engines %}
+                    <label><input type="checkbox" value="{{ engine }}" checked> {{ engine }}</label>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="custom-select">
+                <label>Degradations</label>
+                <button class="select-button" id="degradation-select-button">All Degradations</button>
+                <div class="checkbox-list" id="degradation-filters">
+                    <div class="select-all-buttons">
+                        <button data-action="select-all">Select All</button>
+                        <button data-action="deselect-all">Deselect All</button>
+                    </div>
+                    {% for degradation in degradations %}
+                    <label><input type="checkbox" value="{{ degradation }}" checked> {{ degradation|capitalize }}</label>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="custom-select">
+                <label>Enhancements</label>
+                <button class="select-button" id="enhancement-select-button">All Enhancements</button>
+                <div class="checkbox-list" id="enhancement-filters">
+                    <div class="select-all-buttons">
+                        <button data-action="select-all">Select All</button>
+                        <button data-action="deselect-all">Deselect All</button>
+                    </div>
+                    {% for enhancement in enhancements %}
+                    <label><input type="checkbox" value="{{ enhancement }}" checked> {{ enhancement|capitalize }}</label>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="custom-select">
+                <label>Normalizations</label>
+                <button class="select-button" id="normalization-select-button">All Normalizations</button>
+                <div class="checkbox-list" id="normalization-filters">
+                    <div class="select-all-buttons">
+                        <button data-action="select-all">Select All</button>
+                        <button data-action="deselect-all">Deselect All</button>
+                    </div>
+                    {% for normalization in normalizations %}
+                    <label><input type="checkbox" value="{{ normalization }}" checked> {{ normalization|capitalize }}</label>
+                    {% endfor %}
+                </div>
+            </div>
+            <button class="home-btn" id="home-btn" title="Reset all filters">Reset</button>
+        </div>
+
+        <!-- Tabs Container -->
+        <div class="tabs-container">
+            <!-- Tab Navigation -->
+            <nav class="tabs-nav">
+                <button class="tab-btn active" data-tab="performance">Performance Overview</button>
+                <button class="tab-btn" data-tab="charts">Metrics Visualization</button>
+                <button class="tab-btn" data-tab="analysis">Detailed Transcription Analysis</button>
+                <button class="tab-btn" data-tab="data">Results Summary</button>
+                <button class="tab-btn" data-tab="help">Help</button>
+            </nav>
+
+            <!-- Tab 1: Performance Overview -->
+            <div class="tab-content active" id="tab-performance">
+                <!-- Metric Selector -->
+                <div class="control-bar">
+                    <label>Chart Metric:</label>
+                    <div class="metric-radio-group" id="metric-radios">
+                        {% for key, info in metrics_info.items() %}
+                        <label title="{{ info.description }}">
+                            <input type="radio" name="chart-metric" value="{{ key }}" {% if key == 'wer' %}checked{% endif %}>
+                            <span>{{ key|upper }}</span>
+                        </label>
+                        {% endfor %}
                     </div>
                 </div>
-
-                <div class="plotly-container">
+                
+                <div class="plotly-container" id="main-chart">
                     {{ plotly_div|safe }}
                 </div>
-            </section>
+            </div>
 
-            <!-- Summary Table (right under the dashboard) -->
-            <section>
-                <h2>📋 Summary Table</h2>
-                <p style="color: #666; margin-bottom: 1em; font-size: 0.9em;">
-                    💡 Click on column headers to sort • Click again to reverse order
+            <!-- Tab 2: Charts (Heatmap + Box Plots) -->
+            <div class="tab-content" id="tab-charts">
+                <!-- Metrics Heatmap -->
+                <h3>Metrics Heatmap</h3>
+                <p style="color: var(--secondary-color); font-size: 0.85rem; margin-bottom: 1rem;">
+                    Comparison of all metrics across engine/condition combinations. Green = better, Red = worse. WIP is inverted (higher is better).
                 </p>
+                <div class="plotly-container" id="metrics-heatmap"></div>
+                
+                <!-- Box Plots -->
+                <h3 style="margin-top: 2rem;">Resilience Analysis (Box Plots)</h3>
+                <p style="color: var(--secondary-color); font-size: 0.85rem; margin-bottom: 1rem;">
+                    Analyze performance distribution and resilience across different groupings.
+                </p>
+                
+                <div class="boxplot-controls">
+                    <div class="control-group">
+                        <label>Group By:</label>
+                        <select id="boxplot-groupby">
+                            <option value="engine">Engine</option>
+                            <option value="degradation">Degradation</option>
+                            <option value="enhancement">Enhancement</option>
+                            <option value="normalization">Normalization</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Metric:</label>
+                        <select id="boxplot-metric">
+                            {% for key, info in metrics_info.items() %}
+                            <option value="{{ key }}" {% if key == 'wer' %}selected{% endif %}>{{ info.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Color By:</label>
+                        <select id="boxplot-colorby">
+                            <option value="none">None (Single Color)</option>
+                            <option value="engine">Engine</option>
+                            <option value="degradation">Degradation</option>
+                            <option value="enhancement">Enhancement</option>
+                            <option value="normalization">Normalization</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="plotly-container" id="boxplot-chart"></div>
+            </div>
+
+            <!-- Tab 3: Detailed Analysis (Transcriptions) -->
+            <div class="tab-content" id="tab-analysis">
+                <!-- Diff View Selector -->
+                <div class="control-bar">
+                    <label>Diff View:</label>
+                    <div class="metric-radio-group" id="diff-view-radios">
+                        <label title="Word alignment - used for WER, MER, WIL, WIP metrics">
+                            <input type="radio" name="diff-view" value="words" checked>
+                            <span>Word-Level</span>
+                        </label>
+                        <label title="Character alignment - used for CER metric">
+                            <input type="radio" name="diff-view" value="chars">
+                            <span>Character-Level</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div id="transcriptions-container">
+                {% for result in results %}
+                <div class="transcription-card" 
+                     data-engine="{{ result.engine }}" 
+                     data-degradation="{{ result.degradation }}"
+                     data-enhancement="{{ result.enhancement or 'None' }}"
+                     data-normalization="{{ result.normalization or 'None' }}">
+                    <div class="transcription-header">
+                        <div>
+                            <strong>{{ result.engine }}</strong> • 
+                            {{ result.degradation|capitalize }}
+                            {% if result.enhancement and result.enhancement != 'None' %} + {{ result.enhancement|capitalize }}{% endif %}
+                            {% if result.normalization and result.normalization != 'None' %} + {{ result.normalization|capitalize }}{% endif %}
+                        </div>
+                        <div class="transcription-stats">
+                            {% for key, info in metrics_info.items() %}
+                            {% set metric_value = result.get(key) %}
+                            {% if metric_value is not none and metric_value is number %}
+                            <span><strong>{{ key|upper }}:</strong> {{ "%.2f"|format(metric_value * 100) }}%</span>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="transcription-body">
+                        <div class="transcription-col">
+                            <div class="col-header">Reference</div>
+                            <div class="text-content">{{ result.reference_text_words|safe }}</div>
+                        </div>
+                        <div class="transcription-col">
+                            <div class="col-header">Hypothesis (Diff)</div>
+                            <div class="text-content">
+                                <div class="diff-words">{{ result.transcribed_text_words|safe }}</div>
+                                <div class="diff-chars" style="display: none;">{{ result.transcribed_text_chars|safe }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                </div>
+            </div>
+
+            <!-- Tab 4: Data Table -->
+            <div class="tab-content" id="tab-data">
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 1rem;">
+                    <button class="csv-btn" id="csv-download-btn">Download CSV</button>
+                </div>
+                
                 <div class="table-wrapper">
                     <table id="summary-table">
                         <thead>
                             <tr>
-                                <th class="sortable" data-column="0" data-type="text">Dataset</th>
-                                <th class="sortable" data-column="1" data-type="text">Engine</th>
-                                <th class="sortable" data-column="2" data-type="text">Language</th>
-                                <th class="sortable" data-column="3" data-type="text">Type</th>
-                                <th class="sortable" data-column="4" data-type="number">WER</th>
-                                <th class="sortable" data-column="5" data-type="number">Time (s)</th>
+                                <th onclick="sortTable(0, false)">Engine</th>
+                                <th onclick="sortTable(1, false)">Degradation</th>
+                                <th onclick="sortTable(2, false)">Enhancement</th>
+                                <th onclick="sortTable(3, false)">Normalization</th>
+                                {% for key, info in metrics_info.items() %}
+                                <th onclick="sortTable({{ loop.index + 3 }}, true)">{{ key|upper }}</th>
+                                {% endfor %}
+                                <th onclick="sortTable({{ metrics_info|length + 4 }}, true)">Time (s)</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% for row in results %}
-                            <tr>
-                                <td><a href="#transcription-{{ loop.index }}">{{ row.dataset }}</a></td>
-                                <td><strong>{{ row.engine }}</strong></td>
-                                <td>{{ row.language|upper }}</td>
-                                <td>{{ row.degradation|capitalize }}</td>
-                                <td class="number" data-value="{{ row.wer if row.wer is not none else 999999 }}">{{ "%.4f"|format(row.wer) if row.wer is not none else 'N/A' }}</td>
-                                <td class="number" data-value="{{ row.time_s if row.time_s is not none else 999999 }}">{{ "%.2f"|format(row.time_s) if row.time_s is not none else 'N/A' }}</td>
+                            {% for result in results %}
+                            <tr data-engine="{{ result.engine }}" 
+                                data-degradation="{{ result.degradation }}"
+                                data-enhancement="{{ result.enhancement or 'None' }}"
+                                data-normalization="{{ result.normalization or 'None' }}"
+                                {% for key in metrics_info.keys() %}
+                                data-{{ key }}="{{ result.get(key, '') if result.get(key) is not none else '' }}"
+                                {% endfor %}>
+                                <td>{{ result.engine }}</td>
+                                <td>{{ result.degradation|capitalize }}</td>
+                                <td>{{ result.enhancement|capitalize if result.enhancement and result.enhancement != 'None' else '-' }}</td>
+                                <td>{{ result.normalization|capitalize if result.normalization and result.normalization != 'None' else '-' }}</td>
+                                {% for key in metrics_info.keys() %}
+                                {% set metric_value = result.get(key) %}
+                                <td class="number">
+                                    {% if metric_value is not none and metric_value is number %}
+                                    {{ "%.4f"|format(metric_value) }}
+                                    {% else %}-{% endif %}
+                                </td>
+                                {% endfor %}
+                                <td class="number">{{ "%.2f"|format(result.time_s) if result.time_s is number else '-' }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
-            </section>
+            </div>
 
-            <!-- Detailed Transcriptions -->
-            <section>
-                <h2>📝 Detailed Transcriptions</h2>
-
-                <!-- Side by Side View -->
-                <div id="transcriptions">
-                    {% for row in results %}
-                    <div id="transcription-{{ loop.index }}" style="border: 1px solid #ddd; padding: 1.5em; margin: 1.5em 0; border-radius: 8px; background: #fafafa;">
-                        <h3 style="color: #667eea; margin-top: 0;">{{ row.dataset }} - {{ row.engine }}</h3>
-                        <div style="margin: 0.5em 0 1em; padding: 0.8em; background: white; border-radius: 4px;">
-                            <strong>WER:</strong> {{ "%.4f"|format(row.wer) if row.wer is not none else 'N/A' }} | 
-                            <strong>Time:</strong> {{ "%.2f"|format(row.time_s) }}s |
-                            <strong>Type:</strong> {{ row.degradation|capitalize }}
-                        </div>
-                        
-                        <!-- Side by side comparison -->
-                        <div style="display: flex; gap: 1em; margin-top: 1em;">
-                            <!-- Reference Text Column -->
-                            <div style="flex: 1; min-width: 0;">
-                                <p style="margin-bottom: 0.5em; font-weight: 600; color: #667eea; font-size: 1.1em;">📄 Reference Text</p>
-                                <div style="background: white; padding: 1.2em; border-left: 4px solid #667eea; border-radius: 4px; min-height: 200px; line-height: 1.8; word-wrap: break-word; overflow-wrap: break-word;">
-                                    {{ row.reference_text|safe }}
-                                </div>
-                            </div>
-                            
-                            <!-- Transcribed Text Column -->
-                            <div style="flex: 1; min-width: 0;">
-                                <p style="margin-bottom: 0.5em; font-weight: 600; color: #764ba2; font-size: 1.1em;">🎤 Transcribed Text</p>
-                                <div style="background: white; padding: 1.2em; border-left: 4px solid #764ba2; border-radius: 4px; min-height: 200px; line-height: 1.8; word-wrap: break-word; overflow-wrap: break-word;">
-                                    {{ row.transcribed_text|safe }}
-                                </div>
-                            </div>
-                        </div>
+            <!-- Tab 5: Help -->
+            <div class="tab-content" id="tab-help">
+                <div class="help-section">
+                    <h3>Metrics Reference</h3>
+                    <p style="color: var(--secondary-color); margin-bottom: 1.5rem;">
+                        This section explains the metrics used to evaluate ASR (Automatic Speech Recognition) performance.
+                        All metrics are computed by comparing the reference (ground truth) text with the hypothesis (transcription) text.
+                    </p>
+                    
+                    <div class="metric-card">
+                        <h4>WER - Word Error Rate</h4>
+                        <p><strong>Range:</strong> 0 to ∞ (typically 0 to 1) &nbsp;|&nbsp; <strong>Lower is better</strong></p>
+                        <p>The most common ASR metric. Measures the edit distance at word level.</p>
+                        <p class="formula">WER = (Substitutions + Deletions + Insertions) / Total Reference Words</p>
+                        <p><em>Example:</em> If reference is "the cat sat" and hypothesis is "a cat sits", WER = 2/3 = 0.667</p>
                     </div>
-                    {% endfor %}
+                    
+                    <div class="metric-card">
+                        <h4>CER - Character Error Rate</h4>
+                        <p><strong>Range:</strong> 0 to ∞ (typically 0 to 1) &nbsp;|&nbsp; <strong>Lower is better</strong></p>
+                        <p>Like WER but computed at character level. More granular, useful for languages without clear word boundaries.</p>
+                        <p class="formula">CER = (Char Substitutions + Char Deletions + Char Insertions) / Total Reference Characters</p>
+                        <p><em>Note:</em> CER is often lower than WER since partial word matches are credited.</p>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <h4>MER - Match Error Rate</h4>
+                        <p><strong>Range:</strong> 0 to 1 &nbsp;|&nbsp; <strong>Lower is better</strong></p>
+                        <p>Proportion of words that were not correctly matched between reference and hypothesis.</p>
+                        <p class="formula">MER = (Substitutions + Deletions + Insertions) / (Hits + Substitutions + Deletions + Insertions)</p>
+                        <p><em>Key difference from WER:</em> MER is bounded at 1.0 and accounts for hypothesis length.</p>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <h4>WIL - Word Information Lost</h4>
+                        <p><strong>Range:</strong> 0 to 1 &nbsp;|&nbsp; <strong>Lower is better</strong></p>
+                        <p>Measures the proportion of word information that was lost in transcription.</p>
+                        <p class="formula">WIL = 1 - (Hits² / (Reference Length × Hypothesis Length))</p>
+                        <p><em>Interpretation:</em> Combines precision and recall into a single information-theoretic measure.</p>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <h4>WIP - Word Information Preserved</h4>
+                        <p><strong>Range:</strong> 0 to 1 &nbsp;|&nbsp; <strong>Higher is better</strong></p>
+                        <p>The complement of WIL - measures how much word information was correctly preserved.</p>
+                        <p class="formula">WIP = Hits² / (Reference Length × Hypothesis Length) = 1 - WIL</p>
+                        <p><em>Note:</em> This is the only metric where higher values indicate better performance.</p>
+                    </div>
                 </div>
-            </section>
+                
+                <div class="help-section" style="margin-top: 2rem;">
+                    <h3>Understanding the Visualizations</h3>
+                    
+                    <div class="metric-card">
+                        <h4>Performance Overview</h4>
+                        <p>Interactive scatter plot showing the trade-off between processing time (X-axis) and error rate (Y-axis).
+                        Points closer to the bottom-left corner represent faster and more accurate transcriptions.</p>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <h4>Metrics Heatmap</h4>
+                        <p>Color-coded matrix comparing all metrics across configurations. Green indicates good performance, 
+                        red indicates poor performance. WIP column is inverted since higher values are better.</p>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <h4>Box Plots (Resilience Analysis)</h4>
+                        <p>Shows the distribution of metric values grouped by engine, degradation type, or other factors.
+                        Useful for identifying which engines are most resilient to audio degradation.</p>
+                        <ul style="margin-top: 0.5rem; padding-left: 1.5rem;">
+                            <li><strong>Box:</strong> Shows the interquartile range (IQR) - middle 50% of values</li>
+                            <li><strong>Line in box:</strong> Median value</li>
+                            <li><strong>Whiskers:</strong> Extend to 1.5× IQR from the box</li>
+                            <li><strong>Points beyond whiskers:</strong> Outliers</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <h4>Transcription Analysis</h4>
+                        <p>Side-by-side comparison of reference and hypothesis texts with diff highlighting:</p>
+                        <ul style="margin-top: 0.5rem; padding-left: 1.5rem;">
+                            <li><span class="diff-del">Deleted text</span> - Words/characters in reference but missing in hypothesis</li>
+                            <li><span class="diff-add">Inserted text</span> - Words/characters in hypothesis but not in reference</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="help-section" style="margin-top: 2rem;">
+                    <h3>Filters</h3>
+                    <p>Use the dropdown filters at the top to focus on specific subsets of results. 
+                    All tabs respect the current filter selection. Click "Reset" to restore all filters to default.</p>
+                </div>
+            </div>
         </div>
 
         <footer>
-            <p>Generated by ASR.lab - Automatic Speech Recognition Benchmarking Platform</p>
-            <p>{{ generation_date }}</p>
+            Generated by ASR.lab Benchmark Framework
         </footer>
     </div>
 
     <script>
-        // Custom multi-select dropdown and Plotly filtering
-        (function() {
-            function setupDropdown(buttonId, listId) {
-                const button = document.getElementById(buttonId);
-                const list = document.getElementById(listId);
+    (function() {
+        // ============ DEBOUNCE FOR PERFORMANCE ============
+        let updateTimeout = null;
+        function debouncedUpdate() {
+            if (updateTimeout) clearTimeout(updateTimeout);
+            updateTimeout = setTimeout(() => {
+                updateAllViews();
+            }, 150); // 150ms debounce - balances responsiveness with performance
+        }
 
-                button.addEventListener('click', () => {
-                    list.style.display = list.style.display === 'block' ? 'none' : 'block';
+        // ============ DROPDOWN FILTERS ============
+        function setupDropdown(buttonId, listId) {
+            const button = document.getElementById(buttonId);
+            const list = document.getElementById(listId);
+            if (!button || !list) return;
+            
+            button.addEventListener('click', (e) => {
+                e.stopPropagation();
+                document.querySelectorAll('.checkbox-list').forEach(l => {
+                    if (l !== list) l.classList.remove('open');
                 });
-
-                // Close dropdown if clicking outside
-                document.addEventListener('click', (event) => {
-                    if (!button.contains(event.target) && !list.contains(event.target)) {
-                        list.style.display = 'none';
-                    }
-                });
-
-                // Add select/deselect all functionality
-                list.querySelectorAll('.select-all-buttons button').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        e.stopPropagation(); // Prevent dropdown from closing
-                        const action = e.target.dataset.action;
-                        const checkboxes = list.querySelectorAll('input[type="checkbox"]');
-                        checkboxes.forEach(cb => {
-                            cb.checked = (action === 'select-all');
-                        });
-                        // Trigger change event on the first checkbox to update the plot
-                        if (checkboxes.length > 0) {
-                            checkboxes[0].dispatchEvent(new Event('change'));
-                        }
+                list.classList.toggle('open');
+            });
+            
+            // Prevent dropdown from closing when clicking inside it
+            list.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+            
+            list.querySelectorAll('[data-action]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const action = e.target.dataset.action;
+                    list.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                        cb.checked = action === 'select-all';
                     });
-                });
-            }
-
-            setupDropdown('engine-select-button', 'engine-filters');
-            setupDropdown('degradation-select-button', 'degradation-filters');
-
-            // Wait for Plotly to be available
-            const checkPlotly = setInterval(function() {
-                if (window.Plotly) {
-                    clearInterval(checkPlotly);
-                    initializeFilters();
-                }
-            }, 100);
-
-            function initializeFilters() {
-                const chartDiv = document.getElementById('plotly-chart');
-                if (!chartDiv || !chartDiv.data) return;
-
-                const engineCheckboxes = document.querySelectorAll('#engine-filters input[type="checkbox"]');
-                const degradationCheckboxes = document.querySelectorAll('#degradation-filters input[type="checkbox"]');
-
-                function updatePlotVisibility() {
-                    const selectedEngines = Array.from(engineCheckboxes)
-                        .filter(cb => cb.checked)
-                        .map(cb => cb.value);
-                    
-                    const selectedDegradations = Array.from(degradationCheckboxes)
-                        .filter(cb => cb.checked)
-                        .map(cb => cb.value);
-
-                    if (!chartDiv.data) return;
-
-                    const visibility = chartDiv.data.map(trace => {
-                        const traceName = trace.name || '';
-                        const parts = traceName.split(' (');
-                        if (parts.length < 2) return false;
-                        
-                        const engine = parts[0];
-                        const degradation = parts[1].slice(0, -1);
-
-                        return selectedEngines.includes(engine) && selectedDegradations.includes(degradation);
-                    });
-
-                    Plotly.restyle(chartDiv, { visible: visibility });
-                }
-
-                engineCheckboxes.forEach(cb => cb.addEventListener('change', updatePlotVisibility));
-                degradationCheckboxes.forEach(cb => cb.addEventListener('change', updatePlotVisibility));
-            }
-        })();
-
-        // Sortable table functionality
-        (function() {
-            const table = document.getElementById('summary-table');
-            if (!table) return;
-
-            const headers = table.querySelectorAll('th.sortable');
-            let currentSort = { column: -1, ascending: true };
-
-            headers.forEach(header => {
-                header.addEventListener('click', function() {
-                    const column = parseInt(this.dataset.column);
-                    const type = this.dataset.type;
-                    
-                    // Toggle sort direction if clicking same column
-                    if (currentSort.column === column) {
-                        currentSort.ascending = !currentSort.ascending;
-                    } else {
-                        currentSort.column = column;
-                        currentSort.ascending = true;
-                    }
-
-                    // Update header classes
-                    headers.forEach(h => {
-                        h.classList.remove('sort-asc', 'sort-desc');
-                    });
-                    this.classList.add(currentSort.ascending ? 'sort-asc' : 'sort-desc');
-
-                    // Sort the table
-                    sortTable(column, type, currentSort.ascending);
+                    debouncedUpdate();
                 });
             });
-
-            function sortTable(column, type, ascending) {
-                const tbody = table.querySelector('tbody');
-                const rows = Array.from(tbody.querySelectorAll('tr'));
-
-                rows.sort((a, b) => {
-                    let aValue, bValue;
-
-                    if (type === 'number') {
-                        // Use data-value attribute for numbers (handles N/A)
-                        aValue = parseFloat(a.cells[column].dataset.value || a.cells[column].textContent);
-                        bValue = parseFloat(b.cells[column].dataset.value || b.cells[column].textContent);
-                    } else {
-                        // Text comparison
-                        aValue = a.cells[column].textContent.trim().toLowerCase();
-                        bValue = b.cells[column].textContent.trim().toLowerCase();
-                    }
-
-                    if (aValue < bValue) return ascending ? -1 : 1;
-                    if (aValue > bValue) return ascending ? 1 : -1;
-                    return 0;
+            
+            list.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                cb.addEventListener('change', (e) => {
+                    e.stopPropagation();
+                    debouncedUpdate();
                 });
+            });
+        }
+        
+        setupDropdown('engine-select-button', 'engine-filters');
+        setupDropdown('degradation-select-button', 'degradation-filters');
+        setupDropdown('enhancement-select-button', 'enhancement-filters');
+        setupDropdown('normalization-select-button', 'normalization-filters');
+        
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', () => {
+            document.querySelectorAll('.checkbox-list').forEach(l => l.classList.remove('open'));
+        });
 
-                // Clear and re-append sorted rows
-                tbody.innerHTML = '';
-                rows.forEach(row => tbody.appendChild(row));
+        // ============ HOME/RESET BUTTON ============
+        document.getElementById('home-btn').addEventListener('click', () => {
+            // Check all checkboxes
+            document.querySelectorAll('.checkbox-list input[type="checkbox"]').forEach(cb => {
+                cb.checked = true;
+            });
+            // Update all views
+            updateAllViews();
+        });
+
+        // ============ TAB NAVIGATION ============
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+        
+        tabButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabId = btn.dataset.tab;
+                
+                // Update buttons
+                tabButtons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                // Update content
+                tabContents.forEach(content => {
+                    content.classList.remove('active');
+                    if (content.id === `tab-${tabId}`) {
+                        content.classList.add('active');
+                    }
+                });
+                
+                // Trigger resize for Plotly charts when switching tabs
+                window.dispatchEvent(new Event('resize'));
+                
+                // Update charts if needed
+                if (tabId === 'charts') {
+                    createMetricsHeatmap();
+                    createBoxPlot();
+                }
+            });
+        });
+
+        // ============ FILTER HELPERS ============
+        function getSelectedValues(filterId) {
+            return Array.from(document.querySelectorAll(`#${filterId} input[type="checkbox"]:checked`)).map(cb => cb.value);
+        }
+        
+        function getAllOptions(filterId) {
+            return Array.from(document.querySelectorAll(`#${filterId} input[type="checkbox"]`)).map(cb => cb.value);
+        }
+        
+        function isVisible(engine, degradation, enhancement, normalization) {
+            const selectedEngines = getSelectedValues('engine-filters');
+            const selectedDegradations = getSelectedValues('degradation-filters');
+            const selectedEnhancements = getSelectedValues('enhancement-filters');
+            const selectedNormalizations = getSelectedValues('normalization-filters');
+            
+            const enhancementOptions = getAllOptions('enhancement-filters');
+            const normalizationOptions = getAllOptions('normalization-filters');
+            
+            const isEngineVisible = selectedEngines.includes(engine);
+            const isDegradationVisible = selectedDegradations.includes(degradation);
+            const isEnhancementVisible = selectedEnhancements.includes(enhancement) || 
+                                         (enhancement === "None" && !enhancementOptions.includes("None"));
+            const isNormalizationVisible = selectedNormalizations.includes(normalization) || 
+                                           (normalization === "None" && !normalizationOptions.includes("None"));
+            
+            return isEngineVisible && isDegradationVisible && isEnhancementVisible && isNormalizationVisible;
+        }
+
+        // ============ UPDATE ALL VIEWS ============
+        function updateAllViews() {
+            updateMainChart();
+            updateTableRows();
+            updateTranscriptionCards();
+            createMetricsHeatmap();
+            createBoxPlot();
+        }
+
+        // ============ MAIN CHART UPDATE ============
+        const mainChartDiv = document.querySelector('.plotly-container .js-plotly-plot') || document.querySelector('.js-plotly-plot');
+        let cachedMetricData = null;
+        
+        if (mainChartDiv && mainChartDiv.data) {
+            cachedMetricData = mainChartDiv.data.map((trace) => {
+                if (trace.customdata && trace.customdata.length > 0) {
+                    return {
+                        wer: trace.customdata.map(d => d[5]),
+                        cer: trace.customdata.map(d => d[6]),
+                        mer: trace.customdata.map(d => d[7]),
+                        wil: trace.customdata.map(d => d[8]),
+                        wip: trace.customdata.map(d => d[9])
+                    };
+                }
+                return null;
+            });
+        }
+        
+        function updateMainChart() {
+            if (!mainChartDiv || !mainChartDiv.data) return;
+            
+            const visibility = mainChartDiv.data.map(trace => {
+                if (trace.customdata && trace.customdata.length > 0) {
+                    const data = trace.customdata[0];
+                    return isVisible(data[0], data[1], data[2], data[3]);
+                }
+                return false;
+            });
+            Plotly.restyle(mainChartDiv, { visible: visibility });
+        }
+
+        // ============ METRIC SWITCHER ============
+        const metricRadios = document.querySelectorAll('#metric-radios input[type="radio"]');
+        const metricNames = {
+            'wer': 'Word Error Rate (WER)',
+            'cer': 'Character Error Rate (CER)',
+            'mer': 'Match Error Rate (MER)',
+            'wil': 'Word Information Lost (WIL)',
+            'wip': 'Word Information Preserved (WIP)'
+        };
+        
+        function updateChartMetric() {
+            const selectedMetric = document.querySelector('#metric-radios input[type="radio"]:checked')?.value || 'wer';
+            const metricName = metricNames[selectedMetric];
+            
+            if (mainChartDiv && mainChartDiv.data && cachedMetricData) {
+                const indicesToUpdate = [];
+                const yValues = [];
+                
+                cachedMetricData.forEach((data, idx) => {
+                    if (data !== null) {
+                        indicesToUpdate.push(idx);
+                        yValues.push(data[selectedMetric]);
+                    }
+                });
+                
+                if (indicesToUpdate.length > 0) {
+                    Plotly.restyle(mainChartDiv, { y: yValues }, indicesToUpdate);
+                }
+                
+                const layoutUpdate = {};
+                const numAxes = Object.keys(mainChartDiv.layout).filter(k => k.startsWith('yaxis')).length;
+                layoutUpdate['yaxis.title.text'] = metricName;
+                for (let i = 2; i <= numAxes + 1; i++) {
+                    layoutUpdate[`yaxis${i}.title.text`] = metricName;
+                }
+                Plotly.relayout(mainChartDiv, layoutUpdate);
             }
-        })();
+            
+            // Auto-select diff view based on metric
+            const diffViewRadios = document.querySelectorAll('#diff-view-radios input[type="radio"]');
+            if (selectedMetric === 'cer') {
+                diffViewRadios.forEach(r => r.checked = (r.value === 'chars'));
+            } else {
+                diffViewRadios.forEach(r => r.checked = (r.value === 'words'));
+            }
+            updateDiffView();
+        }
+        
+        metricRadios.forEach(radio => radio.addEventListener('change', updateChartMetric));
+
+        // ============ TABLE ROWS UPDATE ============
+        function updateTableRows() {
+            document.querySelectorAll('#summary-table tbody tr').forEach(row => {
+                const visible = isVisible(
+                    row.dataset.engine,
+                    row.dataset.degradation,
+                    row.dataset.enhancement || "None",
+                    row.dataset.normalization || "None"
+                );
+                row.style.display = visible ? '' : 'none';
+            });
+        }
+
+        // ============ TRANSCRIPTION CARDS UPDATE ============
+        function updateTranscriptionCards() {
+            document.querySelectorAll('.transcription-card').forEach(card => {
+                const visible = isVisible(
+                    card.dataset.engine,
+                    card.dataset.degradation,
+                    card.dataset.enhancement || "None",
+                    card.dataset.normalization || "None"
+                );
+                card.style.display = visible ? '' : 'none';
+            });
+        }
+
+        // ============ DIFF VIEW ============
+        const diffViewRadios = document.querySelectorAll('#diff-view-radios input[type="radio"]');
+        
+        function updateDiffView() {
+            const selectedView = document.querySelector('#diff-view-radios input[type="radio"]:checked')?.value || 'words';
+            const wordDiffs = document.querySelectorAll('.diff-words');
+            const charDiffs = document.querySelectorAll('.diff-chars');
+            
+            if (selectedView === 'words') {
+                wordDiffs.forEach(el => el.style.display = '');
+                charDiffs.forEach(el => el.style.display = 'none');
+            } else {
+                wordDiffs.forEach(el => el.style.display = 'none');
+                charDiffs.forEach(el => el.style.display = '');
+            }
+        }
+        
+        diffViewRadios.forEach(radio => radio.addEventListener('change', updateDiffView));
+
+        // ============ METRICS HEATMAP ============
+        function createMetricsHeatmap() {
+            const chartDiv = document.getElementById('metrics-heatmap');
+            if (!chartDiv) return;
+            
+            const tableRows = document.querySelectorAll('#summary-table tbody tr');
+            const data = [];
+            
+            tableRows.forEach(row => {
+                if (row.style.display === 'none') return;
+                
+                const label = `${row.dataset.engine} | ${row.dataset.degradation} | ${row.dataset.enhancement || 'None'} | ${row.dataset.normalization || 'None'}`;
+                data.push({
+                    label: label,
+                    wer: parseFloat(row.dataset.wer) || null,
+                    cer: parseFloat(row.dataset.cer) || null,
+                    mer: parseFloat(row.dataset.mer) || null,
+                    wil: parseFloat(row.dataset.wil) || null,
+                    wip: parseFloat(row.dataset.wip) || null
+                });
+            });
+            
+            if (data.length === 0) {
+                Plotly.purge(chartDiv);
+                chartDiv.innerHTML = '<p style="text-align:center; padding: 2rem; color: #888;">No data to display</p>';
+                return;
+            }
+            
+            data.sort((a, b) => (a.wer || 1) - (b.wer || 1));
+            
+            const labels = data.map(d => d.label);
+            const z = data.map(d => [d.wer, d.cer, d.mer, d.wil, d.wip !== null ? 1 - d.wip : null]);
+            const hovertext = data.map(d => [
+                `WER: ${d.wer?.toFixed(4) || 'N/A'}`,
+                `CER: ${d.cer?.toFixed(4) || 'N/A'}`,
+                `MER: ${d.mer?.toFixed(4) || 'N/A'}`,
+                `WIL: ${d.wil?.toFixed(4) || 'N/A'}`,
+                `WIP: ${d.wip?.toFixed(4) || 'N/A'}`
+            ]);
+            
+            const trace = {
+                z: z,
+                x: ['WER', 'CER', 'MER', 'WIL', 'WIP'],
+                y: labels,
+                type: 'heatmap',
+                colorscale: [[0, '#27ae60'], [0.15, '#2ecc71'], [0.3, '#f1c40f'], [0.5, '#e67e22'], [0.75, '#e74c3c'], [1, '#c0392b']],
+                zmin: 0,
+                zmax: 1,
+                hovertext: hovertext,
+                hoverinfo: 'text+y',
+                showscale: true,
+                colorbar: { title: 'Error Rate', tickvals: [0, 0.25, 0.5, 0.75, 1], ticktext: ['0 (Best)', '0.25', '0.5', '0.75', '1 (Worst)'] }
+            };
+            
+            const layout = {
+                margin: { l: 300, r: 50, t: 30, b: 50 },
+                xaxis: { side: 'top', tickangle: 0 },
+                yaxis: { autorange: 'reversed', tickfont: { size: 10 } },
+                height: Math.min(800, Math.max(300, data.length * 20 + 80))
+            };
+            
+            Plotly.newPlot(chartDiv, [trace], layout, { responsive: true });
+        }
+
+        // ============ BOX PLOTS ============
+        function createBoxPlot() {
+            const chartDiv = document.getElementById('boxplot-chart');
+            if (!chartDiv) return;
+            
+            const groupBy = document.getElementById('boxplot-groupby')?.value || 'engine';
+            const metric = document.getElementById('boxplot-metric')?.value || 'wer';
+            const colorBy = document.getElementById('boxplot-colorby')?.value || 'none';
+            
+            const tableRows = document.querySelectorAll('#summary-table tbody tr');
+            const groups = {};
+            
+            tableRows.forEach(row => {
+                if (row.style.display === 'none') return;
+                
+                const value = parseFloat(row.dataset[metric]);
+                if (isNaN(value)) return;
+                
+                let groupKey;
+                switch (groupBy) {
+                    case 'engine': groupKey = row.dataset.engine; break;
+                    case 'degradation': groupKey = row.dataset.degradation; break;
+                    case 'enhancement': groupKey = row.dataset.enhancement || 'None'; break;
+                    case 'normalization': groupKey = row.dataset.normalization || 'None'; break;
+                    default: groupKey = row.dataset.engine;
+                }
+                
+                let colorKey = 'default';
+                if (colorBy !== 'none') {
+                    switch (colorBy) {
+                        case 'engine': colorKey = row.dataset.engine; break;
+                        case 'degradation': colorKey = row.dataset.degradation; break;
+                        case 'enhancement': colorKey = row.dataset.enhancement || 'None'; break;
+                        case 'normalization': colorKey = row.dataset.normalization || 'None'; break;
+                    }
+                }
+                
+                const key = `${groupKey}|||${colorKey}`;
+                if (!groups[key]) {
+                    groups[key] = { group: groupKey, color: colorKey, values: [] };
+                }
+                groups[key].values.push(value);
+            });
+            
+            if (Object.keys(groups).length === 0) {
+                Plotly.purge(chartDiv);
+                chartDiv.innerHTML = '<p style="text-align:center; padding: 2rem; color: #888;">No data to display</p>';
+                return;
+            }
+            
+            // Create traces
+            const traces = [];
+            const colorPalette = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22', '#34495e'];
+            const colorMap = {};
+            let colorIdx = 0;
+            
+            Object.values(groups).forEach(g => {
+                if (!colorMap[g.color]) {
+                    colorMap[g.color] = colorPalette[colorIdx % colorPalette.length];
+                    colorIdx++;
+                }
+                
+                traces.push({
+                    y: g.values,
+                    x: Array(g.values.length).fill(g.group),
+                    name: colorBy !== 'none' ? g.color : g.group,
+                    type: 'box',
+                    boxpoints: 'outliers',
+                    marker: { color: colorMap[g.color] },
+                    line: { color: colorMap[g.color] }
+                });
+            });
+            
+            const layout = {
+                title: `${metric.toUpperCase()} Distribution by ${groupBy.charAt(0).toUpperCase() + groupBy.slice(1)}`,
+                yaxis: { title: metricNames[metric] || metric.toUpperCase(), rangemode: 'tozero' },
+                xaxis: { title: groupBy.charAt(0).toUpperCase() + groupBy.slice(1) },
+                boxmode: 'group',
+                showlegend: colorBy !== 'none',
+                margin: { t: 50, b: 80 }
+            };
+            
+            Plotly.newPlot(chartDiv, traces, layout, { responsive: true });
+        }
+        
+        // Box plot controls
+        document.getElementById('boxplot-groupby')?.addEventListener('change', createBoxPlot);
+        document.getElementById('boxplot-metric')?.addEventListener('change', createBoxPlot);
+        document.getElementById('boxplot-colorby')?.addEventListener('change', createBoxPlot);
+
+        // ============ CSV DOWNLOAD ============
+        document.getElementById('csv-download-btn')?.addEventListener('click', () => {
+            const table = document.getElementById('summary-table');
+            if (!table) return;
+            
+            const rows = [];
+            
+            // Header
+            const headerCells = table.querySelectorAll('thead th');
+            rows.push(Array.from(headerCells).map(th => th.textContent.trim()));
+            
+            // Data rows (only visible)
+            table.querySelectorAll('tbody tr').forEach(row => {
+                if (row.style.display === 'none') return;
+                const cells = row.querySelectorAll('td');
+                rows.push(Array.from(cells).map(td => td.textContent.trim()));
+            });
+            
+            // Create CSV
+            const csv = rows.map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(',')).join('\n');
+            
+            // Download
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'asr_benchmark_results.csv';
+            link.click();
+            URL.revokeObjectURL(link.href);
+        });
+
+        // ============ TABLE SORTING ============
+        // Optimized sorting using native Array.sort (much faster than bubble sort)
+        let sortDirection = {};
+        
+        window.sortTable = function(n, isNumber) {
+            const table = document.getElementById("summary-table");
+            const tbody = table.querySelector("tbody");
+            const rows = Array.from(tbody.querySelectorAll("tr"));
+            
+            // Toggle direction for this column
+            sortDirection[n] = sortDirection[n] === "asc" ? "desc" : "asc";
+            const dir = sortDirection[n];
+            
+            // Sort rows using native sort (O(n log n) vs O(n²) for bubble sort)
+            rows.sort((rowA, rowB) => {
+                const cellA = rowA.getElementsByTagName("TD")[n];
+                const cellB = rowB.getElementsByTagName("TD")[n];
+                
+                if (!cellA || !cellB) return 0;
+                
+                let a = cellA.textContent.trim();
+                let b = cellB.textContent.trim();
+                
+                if (isNumber) {
+                    a = parseFloat(a.replace(/[-%]/g, '')) || 0;
+                    b = parseFloat(b.replace(/[-%]/g, '')) || 0;
+                } else {
+                    a = a.toLowerCase();
+                    b = b.toLowerCase();
+                }
+                
+                let comparison = 0;
+                if (a < b) comparison = -1;
+                else if (a > b) comparison = 1;
+                
+                return dir === "asc" ? comparison : -comparison;
+            });
+            
+            // Re-append sorted rows in one batch (triggers single reflow)
+            rows.forEach(row => tbody.appendChild(row));
+        };
+
+        // ============ INITIAL SETUP ============
+        // Initialize table visibility first (needed for heatmap/boxplot)
+        updateTableRows();
+        updateTranscriptionCards();
+        updateMainChart();
+        
+        // Delay chart creation to ensure DOM is ready
+        setTimeout(() => {
+            createMetricsHeatmap();
+            createBoxPlot();
+        }, 100);
+    })();
     </script>
 </body>
 </html>

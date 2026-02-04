@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Dict, Any
 
 from .base import ASREngine
+from ..core.models import EngineConfig, TranscriptionResult
 
 
 class NeMoEngine(ASREngine):
@@ -13,9 +14,9 @@ class NeMoEngine(ASREngine):
     Supports models like Parakeet, QuartzNet, Citrinet, Conformer-CTC.
     """
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: EngineConfig):
         super().__init__(config)
-        self.model_name = self.config.get("model_name")
+        self.model_name = getattr(self.config, "model_name", None)
         if not self.model_name:
             raise ValueError("NeMoEngine config must include a 'model_name'")
         
@@ -39,7 +40,7 @@ class NeMoEngine(ASREngine):
             self.model = self.model.to(self.device)
             self.model.eval()
 
-    def transcribe(self, audio_path: Path, language: str) -> Dict[str, Any]:
+    def transcribe(self, audio_path: Path, language: str) -> TranscriptionResult:
         """Transcribes an audio file using the loaded NeMo model."""
         if self.model is None:
             self.load_model()
@@ -61,11 +62,11 @@ class NeMoEngine(ASREngine):
         else:
             text = ""
 
-        return {
-            "text": text,
-            "processing_time": elapsed,
-            "confidence": None  # NeMo doesn't provide confidence by default
-        }
+        return TranscriptionResult(
+            text=text,
+            processing_time=elapsed,
+            confidence=None
+        )
 
     def get_metadata(self) -> Dict[str, Any]:
         """Returns metadata about the NeMo model."""

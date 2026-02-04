@@ -6,14 +6,15 @@ from transformers import HubertForCTC, Wav2Vec2FeatureExtractor, Wav2Vec2CTCToke
 import librosa
 
 from .base import ASREngine
+from ..core.models import EngineConfig, TranscriptionResult
 
 
 class HubertEngine(ASREngine):
     """ASR engine for Meta's HuBERT models."""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: EngineConfig):
         super().__init__(config)
-        self.model_id = self.config.get("model_id")
+        self.model_id = getattr(self.config, "model_id", None)
         if not self.model_id:
             raise ValueError("HubertEngine requires 'model_id'")
         
@@ -38,7 +39,7 @@ class HubertEngine(ASREngine):
             self.model = HubertForCTC.from_pretrained(self.model_id).to(self.device)
             self.model.eval()
 
-    def transcribe(self, audio_path: Path, language: str) -> Dict[str, Any]:
+    def transcribe(self, audio_path: Path, language: str) -> TranscriptionResult:
         """Transcribes audio using HuBERT."""
         if self.model is None:
             self.load_model()
@@ -62,11 +63,11 @@ class HubertEngine(ASREngine):
         
         elapsed = time.time() - start_time
 
-        return {
-            "text": text,
-            "processing_time": elapsed,
-            "confidence": None
-        }
+        return TranscriptionResult(
+            text=text,
+            processing_time=elapsed,
+            confidence=None
+        )
 
     def get_metadata(self) -> Dict[str, Any]:
         """Returns model metadata."""

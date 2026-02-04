@@ -18,9 +18,23 @@ class PlotlyVisualizer:
         """Converts the results list into a structured pandas DataFrame."""
         records = []
         for res in results:
-            language = res["dataset"].split('_')[0]
-            is_pristine = "original" in res["dataset"]
-            degradation = "original" if is_pristine else res["dataset"].split("degraded_")[-1]
+            language = res.get("language") or res["dataset"].split('_')[0]
+            degradation = res.get("degradation")
+            enhancement = res.get("enhancement", "None")
+            normalization = res.get("normalization")
+            if not normalization:
+                # Fallback: try to parse from dataset name
+                dataset_name = res["dataset"]
+                if dataset_name.endswith("norm_minus_18"):
+                    normalization = "norm_minus_18"
+                elif dataset_name.endswith("no_norm"):
+                    normalization = "no_norm"
+                else:
+                    normalization = "None"
+            
+            if not degradation:
+                is_pristine = "original" in res["dataset"]
+                degradation = "original" if is_pristine else res["dataset"].split("degraded_")[-1]
 
             # Get WER value (try both lowercase and uppercase for backward compatibility)
             wer_value = res["metrics"].get("wer") or res["metrics"].get("WER")
@@ -30,6 +44,8 @@ class PlotlyVisualizer:
                 "engine": res["engine"],
                 "dataset": res["dataset"],
                 "degradation": degradation,
+                "enhancement": enhancement,
+                "normalization": normalization,
                 "wer": wer_value,
                 "time_s": res["transcription"]["processing_time"],
             }
@@ -48,6 +64,9 @@ class PlotlyVisualizer:
         languages = self.df['language'].unique()
         engines = self.df['engine'].unique()
         degradations = self.df['degradation'].unique()
+
+        enhancements = self.df['enhancement'].unique()
+        normalizations = self.df['normalization'].unique()
 
         # Create subplots - one per language
         num_langs = len(languages)
@@ -80,7 +99,7 @@ class PlotlyVisualizer:
                 symbol_map[deg] = available_symbols[symbol_idx % len(available_symbols)]
                 symbol_idx += 1
 
-        # Add traces for each combination of language, engine, and degradation
+        # Add traces for each combination of language, engine, degradation, enhancement, normalization
         for lang_idx, lang in enumerate(languages):
             row = (lang_idx // cols) + 1
             col = (lang_idx % cols) + 1
@@ -89,52 +108,62 @@ class PlotlyVisualizer:
             
             for engine in engines:
                 for degradation in degradations:
-                    mask = (lang_df['engine'] == engine) & (lang_df['degradation'] == degradation)
-                    subset = lang_df[mask]
-                    
-                    if subset.empty:
-                        continue
-                    
-                    # Create hover text with details
-                    hover_text = [
-                        f"<b>{engine}</b><br>" +
-                        f"WER: {wer:.4f}<br>" +
-                        f"Time: {time_s:.2f}s<br>" +
-                        f"Type: {degradation}<br>" +
-                        f"Dataset: {dataset}"
-                        for wer, time_s, dataset in zip(
-                            subset['wer'], 
-                            subset['time_s'],
-                            subset['dataset']
-                        )
-                    ]
-                    
-                    # Show legend only for the first subplot
-                    show_legend = (lang_idx == 0)
-                    
-                    # Legend group to sync visibility across subplots
-                    legend_group = f"{engine}_{degradation}"
-                    
-                    fig.add_trace(
-                        go.Scatter(
-                            x=subset['time_s'],
-                            y=subset['wer'],
-                            mode='markers',
-                            name=f"{engine} ({degradation})",
-                            legendgroup=legend_group,
-                            showlegend=show_legend,
-                            marker=dict(
-                                size=12,
-                                color=color_map[engine],
-                                symbol=symbol_map[degradation],
-                                line=dict(width=1, color='white')
-                            ),
-                            hovertext=hover_text,
-                            hoverinfo='text',
-                        ),
-                        row=row,
-                        col=col
-                    )
+                    for enhancement in enhancements:
+                        for normalization in normalizations:
+                            mask = (lang_df['engine'] == engine) & \
+                                   (lang_df['degradation'] == degradation) & \
+                                   (lang_df['enhancement'] == enhancement) & \
+                                   (lang_df['normalization'] == normalization)
+                            subset = lang_df[mask]
+                            
+                            if subset.empty:
+                                continue
+                            
+                            enhancement_label = f" + {enhancement}" if enhancement != "None" else ""
+                            normalization_label = f" + {normalization}" if normalization != "None" else ""
+
+                            # Create hover text with details
+                            hover_text = [
+                                f"<b>{engine}</b><br>" +
+                                f"WER: {wer:.4f}<br>" +
+                                f"Time: {time_s:.2f}s<br>" +
+                                f"Type: {degradation}<br>" +
+                                f"Enhancement: {enhancement}<br>" +
+                                f"Normalization: {normalization}<br>" +
+                                f"Dataset: {dataset}"
+                                for wer, time_s, dataset in zip(
+                                    subset['wer'], 
+                                    subset['time_s'],
+                                    subset['dataset']
+                                )
+                            ]
+                            
+                            # Show legend only for the first subplot
+                            show_legend = (lang_idx == 0)
+                            
+                            # Legend group to sync visibility across subplots
+                            legend_group = f"{engine}_{degradation}_{enhancement}_{normalization}"
+                            
+                            fig.add_trace(
+                                go.Scatter(
+                                    x=subset['time_s'],
+                                    y=subset['wer'],
+                                    mode='markers',
+                                    name=f"{engine} ({degradation}{enhancement_label}{normalization_label})",
+                                    legendgroup=legend_group,
+                                    showlegend=show_legend,
+                                    marker=dict(
+                                        size=12,
+                                        color=color_map[engine],
+                                        symbol=symbol_map[degradation],
+                                        line=dict(width=1, color='white')
+                                    ),
+                                    hovertext=hover_text,
+                                    hoverinfo='text',
+                                ),
+                                row=row,
+                                col=col
+                            )
 
         # Update axes labels
         for i in range(1, rows + 1):

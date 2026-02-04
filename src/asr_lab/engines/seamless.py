@@ -1,9 +1,11 @@
 import time
 import torch
+import soundfile as sf
 from pathlib import Path
 from typing import Dict, Any
 
 from .base import ASREngine
+from ..core.models import EngineConfig, TranscriptionResult
 
 
 class SeamlessM4TEngine(ASREngine):
@@ -41,9 +43,9 @@ class SeamlessM4TEngine(ASREngine):
         "uk": "ukr",
     }
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: EngineConfig):
         super().__init__(config)
-        self.model_name = self.config.get("model_name", "facebook/seamless-m4t-large")
+        self.model_name = self.config.model_name or "facebook/seamless-m4t-large"
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = None
         self.processor = None
@@ -62,7 +64,7 @@ class SeamlessM4TEngine(ASREngine):
             self.model.eval()
             self.torchaudio = torchaudio
 
-    def transcribe(self, audio_path: Path, language: str) -> Dict[str, Any]:
+    def transcribe(self, audio_path: Path, language: str) -> TranscriptionResult:
         """Transcribes audio using SeamlessM4T."""
         if self.model is None:
             self.load_model()
@@ -72,12 +74,20 @@ class SeamlessM4TEngine(ASREngine):
         # Convert language code to SeamlessM4T format (ISO 639-3)
         tgt_lang = self.LANGUAGE_MAP.get(language.lower(), language)
         
-        audio_input, sample_rate = self.torchaudio.load(str(audio_path))
+        # Use soundfile instead of torchaudio.load to avoid TorchCodec dependency issues on Windows
+        waveform, sample_rate = sf.read(str(audio_path))
+        waveform = torch.from_numpy(waveform).float()
+        if waveform.ndim == 1:
+            waveform = waveform.unsqueeze(0)
+        else:
+            waveform = waveform.t()
+        audio_input = waveform
+
         if sample_rate != 16000:
             resampler = self.torchaudio.transforms.Resample(sample_rate, 16000)
             audio_input = resampler(audio_input)
         
-        inputs = self.processor(audios=audio_input.squeeze().numpy(), return_tensors="pt", sampling_rate=16000)
+        inputs = self.processor(audio=audio_input.squeeze().numpy(), return_tensors="pt", sampling_rate=16000)
         
         with torch.no_grad():
             output_tokens = self.model.generate(**inputs.to(self.device), tgt_lang=tgt_lang, generate_speech=False)
@@ -86,11 +96,11 @@ class SeamlessM4TEngine(ASREngine):
         
         elapsed = time.time() - start_time
 
-        return {
-            "text": text,
-            "processing_time": elapsed,
-            "confidence": None
-        }
+        return TranscriptionResult(
+            text=text,
+            processing_time=elapsed,
+            confidence=None
+        )
 
     def get_metadata(self) -> Dict[str, Any]:
         """Returns model metadata."""

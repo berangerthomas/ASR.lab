@@ -1,6 +1,6 @@
 [project]
 name = "asr-lab"
-version = "0.1.0"
+version = "0.8.0"
 description = "Benchmarking platform for automatic speech recognition models using controlled audio degradation, multiple evaluation metrics, and comparative analysis across languages and model architectures."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -21,10 +21,25 @@ dependencies = [
     "seaborn>=0.13.2",
     "jinja2",
     "torch",
-    "transformers==4.41.2",
+    "transformers>=4.44.0",
     "vosk>=0.3.45",
     "torchaudio>=2.8.0",
     "sentencepiece>=0.2.1",
-    "protobuf>=6.33.0",
-    "nemo_toolkit[asr]>=1.21.0",
+    "protobuf>=5.29.5,<5.30",
+    "nemo_toolkit[asr]>=2.0.0",
+    "tqdm>=4.66.0",
+    "ruff>=0.4.0",
+    "hf-xet>=1.2.0",
+    "pydantic>=2.12.4",
+    "demucs>=4.0.1",
+    "deepfilternet>=0.5.6",
+    "diffq>=0.2.4",
+]
+
+[build-system]
+requires = ["setuptools", "wheel", "Cython"]
+
+[tool.uv]
+override-dependencies = [
+    "triton; sys_platform != 'win32'",
 ]
