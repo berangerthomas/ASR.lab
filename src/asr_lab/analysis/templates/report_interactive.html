@@ -290,16 +290,28 @@
                 </div>
             </div>
             <div class="custom-select">
-                <label>Normalizations</label>
-                <button class="select-button" id="normalization-select-button">All Normalizations</button>
-                <div class="checkbox-list" id="normalization-filters">
+                <label>Audio Normalizations</label>
+                <button class="select-button" id="audio-norm-select-button">All Audio Norms</button>
+                <div class="checkbox-list" id="audio-norm-filters">
                     <div class="select-all-buttons">
                         <button data-action="select-all">Select All</button>
                         <button data-action="deselect-all">Deselect All</button>
                     </div>
-                    {% for normalization in normalizations %}
-                    <label><input type="checkbox" value="{{ normalization }}" checked> {{ normalization|capitalize }}</label>
+                    {% for audio_norm in audio_norms %}
+                    <label><input type="checkbox" value="{{ audio_norm }}" checked> {{ audio_norm|capitalize }}</label>
                     {% endfor %}
+                </div>
+            </div>
+            <div class="custom-select">
+                <label>Texte</label>
+                <button class="select-button" id="text-norm-select-button">Tous</button>
+                <div class="checkbox-list" id="text-norm-filters">
+                    <div class="select-all-buttons">
+                        <button data-action="select-all">Select All</button>
+                        <button data-action="deselect-all">Deselect All</button>
+                    </div>
+                    <label><input type="checkbox" value="raw" checked> Brut</label>
+                    <label><input type="checkbox" value="normalized" checked> Normalisé</label>
                 </div>
             </div>
             <button class="home-btn" id="home-btn" title="Reset all filters">Reset</button>
@@ -407,20 +419,28 @@
                      data-engine="{{ result.engine }}" 
                      data-degradation="{{ result.degradation }}"
                      data-enhancement="{{ result.enhancement or 'None' }}"
-                     data-normalization="{{ result.normalization or 'None' }}">
+                     data-audio-norm="{{ result.audio_norm or 'None' }}"
+                     data-text-norm="{{ result.text_norm or 'raw' }}"
+                     data-index="{{ loop.index0 }}">
                     <div class="transcription-header">
                         <div>
                             <strong>{{ result.engine }}</strong> • 
                             {{ result.degradation|capitalize }}
                             {% if result.enhancement and result.enhancement != 'None' %} + {{ result.enhancement|capitalize }}{% endif %}
-                            {% if result.normalization and result.normalization != 'None' %} + {{ result.normalization|capitalize }}{% endif %}
+                            {% if result.audio_norm and result.audio_norm != 'None' %} + {{ result.audio_norm|capitalize }}{% endif %}
+                            • <span class="text-norm-badge" title="Text Normalization">{{ result.text_norm_display }}</span>
                         </div>
                         <div class="transcription-stats">
                             {% for key, info in metrics_info.items() %}
-                            {% set metric_value = result.get(key) %}
-                            {% if metric_value is not none and metric_value is number %}
-                            <span><strong>{{ key|upper }}:</strong> {{ "%.2f"|format(metric_value * 100) }}%</span>
-                            {% endif %}
+                            <span class="metric-stat" data-metric="{{ key }}">
+                                <strong>{{ key|upper }}:</strong> 
+                                {% set metric_value = result.get(key) %}
+                                {% if metric_value is not none and metric_value is number %}
+                                <span class="metric-value">{{ "%.2f"|format(metric_value * 100) }}%</span>
+                                {% else %}
+                                <span class="metric-value">-</span>
+                                {% endif %}
+                            </span>
                             {% endfor %}
                         </div>
                     </div>
@@ -455,11 +475,12 @@
                                 <th onclick="sortTable(0, false)">Engine</th>
                                 <th onclick="sortTable(1, false)">Degradation</th>
                                 <th onclick="sortTable(2, false)">Enhancement</th>
-                                <th onclick="sortTable(3, false)">Normalization</th>
+                                <th onclick="sortTable(3, false)">Audio Norm</th>
+                                <th onclick="sortTable(4, false)">Text Norm</th>
                                 {% for key, info in metrics_info.items() %}
-                                <th onclick="sortTable({{ loop.index + 3 }}, true)">{{ key|upper }}</th>
+                                <th onclick="sortTable({{ loop.index + 4 }}, true)">{{ key|upper }}</th>
                                 {% endfor %}
-                                <th onclick="sortTable({{ metrics_info|length + 4 }}, true)">Time (s)</th>
+                                <th onclick="sortTable({{ metrics_info|length + 5 }}, true)">Time (s)</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -467,17 +488,20 @@
                             <tr data-engine="{{ result.engine }}" 
                                 data-degradation="{{ result.degradation }}"
                                 data-enhancement="{{ result.enhancement or 'None' }}"
-                                data-normalization="{{ result.normalization or 'None' }}"
+                                data-audio-norm="{{ result.audio_norm or 'None' }}"
+                                data-text-norm="{{ result.text_norm or 'raw' }}"
+                                data-index="{{ loop.index0 }}"
                                 {% for key in metrics_info.keys() %}
                                 data-{{ key }}="{{ result.get(key, '') if result.get(key) is not none else '' }}"
                                 {% endfor %}>
                                 <td>{{ result.engine }}</td>
                                 <td>{{ result.degradation|capitalize }}</td>
                                 <td>{{ result.enhancement|capitalize if result.enhancement and result.enhancement != 'None' else '-' }}</td>
-                                <td>{{ result.normalization|capitalize if result.normalization and result.normalization != 'None' else '-' }}</td>
+                                <td>{{ result.audio_norm|capitalize if result.audio_norm and result.audio_norm != 'None' else '-' }}</td>
+                                <td>{{ result.text_norm_display }}</td>
                                 {% for key in metrics_info.keys() %}
                                 {% set metric_value = result.get(key) %}
-                                <td class="number">
+                                <td class="number metric-cell" data-metric="{{ key }}">
                                     {% if metric_value is not none and metric_value is number %}
                                     {{ "%.4f"|format(metric_value) }}
                                     {% else %}-{% endif %}
@@ -583,6 +607,19 @@
                     <p>Use the dropdown filters at the top to focus on specific subsets of results. 
                     All tabs respect the current filter selection. Click "Reset" to restore all filters to default.</p>
                 </div>
+                
+                <div class="help-section" style="margin-top: 2rem;">
+                    <h3>Metric Normalization</h3>
+                    <p>The normalization checkboxes control how metrics (WER, CER, MER, WIL, WIP) are computed:</p>
+                    <ul style="margin-top: 0.5rem; padding-left: 1.5rem;">
+                        <li><strong>Lowercase:</strong> Case-insensitive comparison ("Hello" = "hello")</li>
+                        <li><strong>Remove Punctuation:</strong> Ignores punctuation marks ("don't" = "dont")</li>
+                        <li><strong>Expand Contractions:</strong> English only - converts "don't" → "do not"</li>
+                    </ul>
+                    <p style="margin-top: 0.75rem; color: var(--secondary-color); font-style: italic;">
+                        <strong>Note:</strong> Text normalization is now a grid search dimension - each combination produces separate results with normalized text shown in the diff view.
+                    </p>
+                </div>
             </div>
         </div>
 
@@ -643,7 +680,8 @@
         setupDropdown('engine-select-button', 'engine-filters');
         setupDropdown('degradation-select-button', 'degradation-filters');
         setupDropdown('enhancement-select-button', 'enhancement-filters');
-        setupDropdown('normalization-select-button', 'normalization-filters');
+        setupDropdown('audio-norm-select-button', 'audio-norm-filters');
+        setupDropdown('text-norm-select-button', 'text-norm-filters');
         
         // Close dropdowns when clicking outside
         document.addEventListener('click', () => {
@@ -683,11 +721,19 @@
                 // Trigger resize for Plotly charts when switching tabs
                 window.dispatchEvent(new Event('resize'));
                 
-                // Update charts if needed
-                if (tabId === 'charts') {
-                    createMetricsHeatmap();
-                    createBoxPlot();
-                }
+                // Update views after tab becomes visible (use setTimeout to ensure DOM is updated)
+                setTimeout(() => {
+                    if (tabId === 'overview') {
+                        updateMainChart();
+                    } else if (tabId === 'summary') {
+                        updateTableRows();
+                    } else if (tabId === 'transcriptions') {
+                        updateTranscriptionCards();
+                    } else if (tabId === 'charts') {
+                        createMetricsHeatmap();
+                        createBoxPlot();
+                    }
+                }, 10);
             });
         });
 
@@ -700,23 +746,25 @@
             return Array.from(document.querySelectorAll(`#${filterId} input[type="checkbox"]`)).map(cb => cb.value);
         }
         
-        function isVisible(engine, degradation, enhancement, normalization) {
+        function isVisible(engine, degradation, enhancement, audioNorm, textNorm) {
             const selectedEngines = getSelectedValues('engine-filters');
             const selectedDegradations = getSelectedValues('degradation-filters');
             const selectedEnhancements = getSelectedValues('enhancement-filters');
-            const selectedNormalizations = getSelectedValues('normalization-filters');
+            const selectedAudioNorms = getSelectedValues('audio-norm-filters');
+            const selectedTextNorms = getSelectedValues('text-norm-filters');
             
             const enhancementOptions = getAllOptions('enhancement-filters');
-            const normalizationOptions = getAllOptions('normalization-filters');
+            const audioNormOptions = getAllOptions('audio-norm-filters');
             
             const isEngineVisible = selectedEngines.includes(engine);
             const isDegradationVisible = selectedDegradations.includes(degradation);
             const isEnhancementVisible = selectedEnhancements.includes(enhancement) || 
                                          (enhancement === "None" && !enhancementOptions.includes("None"));
-            const isNormalizationVisible = selectedNormalizations.includes(normalization) || 
-                                           (normalization === "None" && !normalizationOptions.includes("None"));
+            const isAudioNormVisible = selectedAudioNorms.includes(audioNorm) || 
+                                       (audioNorm === "None" && !audioNormOptions.includes("None"));
+            const isTextNormVisible = selectedTextNorms.includes(textNorm);
             
-            return isEngineVisible && isDegradationVisible && isEnhancementVisible && isNormalizationVisible;
+            return isEngineVisible && isDegradationVisible && isEnhancementVisible && isAudioNormVisible && isTextNormVisible;
         }
 
         // ============ UPDATE ALL VIEWS ============
@@ -730,18 +778,16 @@
 
         // ============ MAIN CHART UPDATE ============
         const mainChartDiv = document.querySelector('.plotly-container .js-plotly-plot') || document.querySelector('.js-plotly-plot');
-        let cachedMetricData = null;
+        
+        // Store trace structure for metric updates
+        // customdata format: [engine, degradation, enhancement, normalization, dataset, wer, cer, mer, wil, wip, result_idx]
+        let traceResultIndices = null;
         
         if (mainChartDiv && mainChartDiv.data) {
-            cachedMetricData = mainChartDiv.data.map((trace) => {
+            // customdata format: [engine, degradation, enhancement, audio_norm, text_norm, dataset, wer, cer, mer, wil, wip, result_idx]
+            traceResultIndices = mainChartDiv.data.map((trace) => {
                 if (trace.customdata && trace.customdata.length > 0) {
-                    return {
-                        wer: trace.customdata.map(d => d[5]),
-                        cer: trace.customdata.map(d => d[6]),
-                        mer: trace.customdata.map(d => d[7]),
-                        wil: trace.customdata.map(d => d[8]),
-                        wip: trace.customdata.map(d => d[9])
-                    };
+                    return trace.customdata.map(d => d[11]);  // result_idx at index 11
                 }
                 return null;
             });
@@ -750,14 +796,21 @@
         function updateMainChart() {
             if (!mainChartDiv || !mainChartDiv.data) return;
             
-            const visibility = mainChartDiv.data.map(trace => {
+            const selectedMetric = document.querySelector('#metric-radios input[type="radio"]:checked')?.value || 'wer';
+            
+            const updates = mainChartDiv.data.map((trace, traceIdx) => {
+                let visible = false;
                 if (trace.customdata && trace.customdata.length > 0) {
                     const data = trace.customdata[0];
-                    return isVisible(data[0], data[1], data[2], data[3]);
+                    // customdata: [engine, degradation, enhancement, audio_norm, text_norm, ...]
+                    visible = isVisible(data[0], data[1], data[2], data[3], data[4]);
                 }
-                return false;
+                
+                return { visible };
             });
-            Plotly.restyle(mainChartDiv, { visible: visibility });
+            
+            // Update visibility
+            Plotly.restyle(mainChartDiv, { visible: updates.map(u => u.visible) });
         }
 
         // ============ METRIC SWITCHER ============
@@ -774,21 +827,24 @@
             const selectedMetric = document.querySelector('#metric-radios input[type="radio"]:checked')?.value || 'wer';
             const metricName = metricNames[selectedMetric];
             
-            if (mainChartDiv && mainChartDiv.data && cachedMetricData) {
-                const indicesToUpdate = [];
-                const yValues = [];
+            if (mainChartDiv && mainChartDiv.data) {
+                // Filter and update selected metric values
+                const metricIndex = {'wer': 6, 'cer': 7, 'mer': 8, 'wil': 9, 'wip': 10};
+                const mIdx = metricIndex[selectedMetric];
                 
-                cachedMetricData.forEach((data, idx) => {
-                    if (data !== null) {
-                        indicesToUpdate.push(idx);
-                        yValues.push(data[selectedMetric]);
+                const newYValues = mainChartDiv.data.map((trace) => {
+                    if (trace.customdata && trace.customdata.length > 0) {
+                        return trace.customdata.map(d => d[mIdx]);
                     }
+                    return null;
                 });
                 
-                if (indicesToUpdate.length > 0) {
-                    Plotly.restyle(mainChartDiv, { y: yValues }, indicesToUpdate);
-                }
+                Plotly.restyle(mainChartDiv, { y: newYValues });
                 
+                // Also update visibility
+                updateMainChart();
+                
+                // Update axis labels
                 const layoutUpdate = {};
                 const numAxes = Object.keys(mainChartDiv.layout).filter(k => k.startsWith('yaxis')).length;
                 layoutUpdate['yaxis.title.text'] = metricName;
@@ -817,7 +873,8 @@
                     row.dataset.engine,
                     row.dataset.degradation,
                     row.dataset.enhancement || "None",
-                    row.dataset.normalization || "None"
+                    row.dataset.audioNorm || "None",
+                    row.dataset.textNorm || "raw"
                 );
                 row.style.display = visible ? '' : 'none';
             });
@@ -830,7 +887,8 @@
                     card.dataset.engine,
                     card.dataset.degradation,
                     card.dataset.enhancement || "None",
-                    card.dataset.normalization || "None"
+                    card.dataset.audioNorm || "None",
+                    card.dataset.textNorm || "raw"
                 );
                 card.style.display = visible ? '' : 'none';
             });
@@ -866,14 +924,36 @@
             tableRows.forEach(row => {
                 if (row.style.display === 'none') return;
                 
-                const label = `${row.dataset.engine} | ${row.dataset.degradation} | ${row.dataset.enhancement || 'None'} | ${row.dataset.normalization || 'None'}`;
+                // Use metrics directly from data attributes (already computed per text_norm)
+                const wer = parseFloat(row.dataset.wer) || null;
+                const cer = parseFloat(row.dataset.cer) || null;
+                const mer = parseFloat(row.dataset.mer) || null;
+                const wil = parseFloat(row.dataset.wil) || null;
+                const wip = parseFloat(row.dataset.wip) || null;
+                
+                // Calculate average error rate for sorting (WIP is inverted: 1-WIP = error)
+                const errorValues = [wer, cer, mer, wil, wip !== null ? 1 - wip : null].filter(v => v !== null);
+                
+                // Construct unique label to prevent Plotly from merging rows with same metadata
+                // We add audio-norm and a unique index
+                const metaParts = [
+                    row.dataset.engine,
+                    row.dataset.degradation,
+                    row.dataset.enhancement || 'None',
+                    row.dataset.audioNorm || 'None',
+                    row.dataset.textNorm || 'raw'
+                ];
+                
+                // Add index to ensure uniqueness even for same configuration (e.g. different files)
+                const label = `${metaParts.join(' | ')} #${data.length + 1}`;
+                
                 data.push({
                     label: label,
-                    wer: parseFloat(row.dataset.wer) || null,
-                    cer: parseFloat(row.dataset.cer) || null,
-                    mer: parseFloat(row.dataset.mer) || null,
-                    wil: parseFloat(row.dataset.wil) || null,
-                    wip: parseFloat(row.dataset.wip) || null
+                    wer: wer,
+                    cer: cer,
+                    mer: mer,
+                    wil: wil,
+                    wip: wip
                 });
             });
             
@@ -883,7 +963,12 @@
                 return;
             }
             
-            data.sort((a, b) => (a.wer || 1) - (b.wer || 1));
+            // Sort by WER (primary metric) to ensure the first column has a perfect green-to-red gradient
+            // Secondary sort by label to keep stable order for identical WERs
+            data.sort((a, b) => {
+                const diff = (a.wer !== null ? a.wer : 1) - (b.wer !== null ? b.wer : 1);
+                return diff !== 0 ? diff : a.label.localeCompare(b.label);
+            });
             
             const labels = data.map(d => d.label);
             const z = data.map(d => [d.wer, d.cer, d.mer, d.wil, d.wip !== null ? 1 - d.wip : null]);
@@ -912,7 +997,13 @@
             const layout = {
                 margin: { l: 300, r: 50, t: 30, b: 50 },
                 xaxis: { side: 'top', tickangle: 0 },
-                yaxis: { autorange: 'reversed', tickfont: { size: 10 } },
+                yaxis: { 
+                    autorange: 'reversed', 
+                    tickfont: { size: 10 },
+                    type: 'category',
+                    categoryorder: 'array',
+                    categoryarray: labels 
+                },
                 height: Math.min(800, Math.max(300, data.length * 20 + 80))
             };
             
@@ -934,15 +1025,17 @@
             tableRows.forEach(row => {
                 if (row.style.display === 'none') return;
                 
+                // Get metric value directly from data attribute (already computed per text_norm)
                 const value = parseFloat(row.dataset[metric]);
-                if (isNaN(value)) return;
+                if (isNaN(value) || value === null || value === undefined) return;
                 
                 let groupKey;
                 switch (groupBy) {
                     case 'engine': groupKey = row.dataset.engine; break;
                     case 'degradation': groupKey = row.dataset.degradation; break;
                     case 'enhancement': groupKey = row.dataset.enhancement || 'None'; break;
-                    case 'normalization': groupKey = row.dataset.normalization || 'None'; break;
+                    case 'audio_norm': groupKey = row.dataset.audioNorm || 'None'; break;
+                    case 'text_norm': groupKey = row.dataset.textNorm || 'raw'; break;
                     default: groupKey = row.dataset.engine;
                 }
                 
@@ -952,7 +1045,8 @@
                         case 'engine': colorKey = row.dataset.engine; break;
                         case 'degradation': colorKey = row.dataset.degradation; break;
                         case 'enhancement': colorKey = row.dataset.enhancement || 'None'; break;
-                        case 'normalization': colorKey = row.dataset.normalization || 'None'; break;
+                        case 'audio_norm': colorKey = row.dataset.audioNorm || 'None'; break;
+                        case 'text_norm': colorKey = row.dataset.textNorm || 'raw'; break;
                     }
                 }
                 
@@ -1086,6 +1180,10 @@
         updateTableRows();
         updateTranscriptionCards();
         updateMainChart();
+        
+        // Initial sort by WER (column 5, ascending - lowest WER first)
+        sortDirection[5] = "desc";  // Will toggle to "asc" on first call
+        sortTable(5, true);
         
         // Delay chart creation to ensure DOM is ready
         setTimeout(() => {

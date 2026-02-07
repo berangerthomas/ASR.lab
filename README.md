@@ -1,6 +1,15 @@
 # ASR.lab
 
+[![Python](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-yellow)](https://huggingface.co/spaces/berangerthomas/ASR.lab-demo)
+
 A comprehensive benchmarking platform for automatic speech recognition (ASR) systems. This tool provides controlled audio degradation, audio enhancement, loudness normalization, multiple evaluation metrics, and comparative analysis across languages and model architectures.
+
+## Live Demo
+
+Try the interactive visualization dashboard online:  
+👉 **[ASR.lab Demo on Hugging Face Spaces](https://huggingface.co/spaces/berangerthomas/ASR.lab-demo)**
 
 ## Overview
 
@@ -32,14 +41,12 @@ Each stage is optional and configurable. Multiple options at each stage create a
 
 | Engine | Status | Notes |
 |--------|--------|-------|
-| Whisper (OpenAI) | Tested | Multilingual, multiple model sizes |
-| Wav2Vec 2.0 (Meta) | Tested | Language-specific fine-tuning |
-| SeamlessM4T (Meta) | Tested | Multilingual translation and transcription |
-| Vosk | Tested | Offline recognition, requires local model |
-| HuBERT (Meta) | Experimental | Uses Wav2Vec2 tokenizer fallback |
-| NeMo (NVIDIA) | Linux only | Does not work on Windows (SIGKILL) |
-| Kaldi | Not implemented | Requires external Kaldi installation |
-| USM (Google) | Not implemented | API not available |
+| Whisper (OpenAI) | ✅ Tested | Multilingual, long-form transcription support |
+| Wav2Vec 2.0 (Meta) | ✅ Tested | Language-specific fine-tuning, outputs normalized to lowercase |
+| SeamlessM4T (Meta) | ✅ Tested | Multilingual translation and transcription |
+| NeMo (NVIDIA) | ✅ Tested | Windows support via SIGTERM patch (see below) |
+| Vosk | ✅ Tested | Offline recognition, requires local model |
+| HuBERT (Meta) | ⚠️ Experimental | Uses Wav2Vec2 tokenizer fallback |
 
 ## Evaluation Metrics
 
@@ -51,42 +58,50 @@ Each stage is optional and configurable. Multiple options at each stage create a
 | **WIL** | Word Information Lost | Proportion of information lost |
 | **WIP** | Word Information Preserved | Complement of WIL |
 
+### Text Normalization (Grid Search Dimension)
+
+Text normalization is applied **systematically** as a grid search dimension. Each transcription generates **two results**:
+
+| Preset | Description |
+|--------|-------------|
+| **raw** | Texte brut, aucune transformation |
+| **normalized** | Minuscules + sans ponctuation + espaces normalisés |
+
+**Normalized preset applies:**
+- **Lowercase conversion**: Case-insensitive comparison
+- **Punctuation removal**: Ignores punctuation differences  
+- **Whitespace normalization**: Collapses multiple spaces, trims
+
+In the interactive report, use the **"Texte"** dropdown to:
+- View **both** raw and normalized results side-by-side
+- Filter to **raw only** to see exact ASR output
+- Filter to **normalized only** for standard ASR evaluation
+
+**Visual Encoding in Interactive Reports:**
+- **Symbol** = Degradation type (circle = original, diamond = reverb, etc.)
+- **Color** = Engine (whisper, nemo, etc.)
+- **Size** = Text normalization (Large = Normalized, Small = Raw)
+
 ## Installation
 
 ### Requirements
 
 - Python 3.12 or higher
-- CUDA-capable GPU (optional, for accelerated inference)
-- 8GB+ RAM recommended
+- Optional CUDA-capable GPU
 
 ### Basic Installation
 
 ```bash
 git clone https://github.com/berangerthomas/ASR.lab.git
 cd ASR.lab
-pip install -e .
-```
-
-### Optional Dependencies
-
-For specific engines, install additional packages:
-
-```bash
-# Vosk (offline recognition)
-pip install vosk
-
-# SeamlessM4T (multilingual)
-pip install torchaudio
-
-# NeMo (NVIDIA models)
-pip install nemo_toolkit[asr]
+uv sync
 ```
 
 ## Configuration
 
 Benchmarks are defined in YAML configuration files located in `configs/`.
 
-See `configs/reference_complete.yaml` for a complete configuration reference.
+See `configs/example.yaml` for a complete configuration reference.
 
 ### Basic Configuration Structure
 
@@ -98,7 +113,6 @@ benchmark:
 data:
   audio_source_dir: "data/audio"
   processed_dir: "data/processed"
-  reference_dir: "data/references"
 
 audio_processing:
   sample_rate: 16000
@@ -152,28 +166,35 @@ metrics:
 ### Running a Benchmark
 
 ```bash
-python main.py run --config configs/default.yaml
+python main.py run -c configs/default.yaml
 ```
 
-### Multi-Engine Comparison
+This will:
+1. Run transcriptions with all configured engines
+2. Compute metrics for both raw and normalized text (grid search dimension)
+3. Generate an interactive HTML report with dropdown filters including text normalization
 
-Use the provided multi-engine configuration:
+### Interactive Report Features
 
-```bash
-python main.py run --config configs/multi_engine.yaml
-```
+The generated `report_interactive.html` includes:
+
+- **Interactive Metric Normalization**: Toggle lowercase, punctuation removal, and contraction expansion - metrics update instantly without regenerating the report
+- **Multi-filter dropdowns**: Filter by engine, degradation, enhancement, and normalization
+- **Sortable tables**: Click column headers to sort
+- **Side-by-side diff**: Compare reference and hypothesis with error highlighting
+- **Multiple visualizations**: Scatter plots, heatmaps, box plots
 
 ### Output
 
-Results are saved to `results/reports/`:
+Results are saved to `results/reports/<config>/`:
 
-- `report_interactive.html`: Interactive HTML report with visualizations
-- `results.csv`: Raw results in CSV format
-- `raw_results.json`: Complete results with metadata
+- `report_interactive.html`: Interactive HTML report with embedded metrics variants
+- `results.csv`: Results in CSV format
+- `raw_results.json`: JSON backup with reference and hypothesis text
 
 ### Viewing Results
 
-Open `results/reports/report_interactive.html` in a web browser. The report includes:
+Open `results/reports/<config>/report_interactive.html` in a web browser. The report includes:
 
 - Interactive Plotly charts with multi-filter dropdowns (engine, degradation, enhancement, normalization)
 - Sortable summary table (click column headers)
@@ -182,36 +203,34 @@ Open `results/reports/report_interactive.html` in a web browser. The report incl
 
 ## Data Organization
 
-### Option 1: File-based (Simple)
+### Manifest File (Required)
 
-```text
-data/
-├── audio/           # Source audio files (WAV format)
-├── processed/       # Degraded audio files
-└── references/      # Reference transcriptions (TXT format)
-```
-
-Audio files should be named consistently with reference files:
-- Audio: `fr_0.wav` (prefix `fr` indicates language)
-- Reference: `fr_0.txt`
-
-### Option 2: Manifest-based (Robust)
-
-Create a `manifest.json` in your audio directory:
+Create a `manifest.json` in your audio directory with all audio files and their reference transcriptions:
 
 ```json
 [
   {
-    "audio_filepath": "data/audio/sample1.wav",
+    "audio_filepath": "sample1.wav",
     "text": "This is a sample transcription.",
     "lang": "en"
   },
   {
-    "audio_filepath": "data/audio/sample2.wav",
+    "audio_filepath": "sample2.wav",
     "text": "Ceci est une transcription.",
     "lang": "fr"
   }
 ]
+```
+
+**Required fields:**
+- `audio_filepath`: Path to audio file (relative to manifest location or absolute)
+- `text`: Reference transcription (ground truth)
+- `lang`: Language code (ISO 639-1: en, fr, de, es, etc.)
+
+**Audio format requirements:**
+- WAV format recommended
+- 16kHz sample rate (or configure in `audio_processing.sample_rate`)
+- Mono channel recommended
 ```
 
 ## Extending the Platform
@@ -288,6 +307,21 @@ Ensure audio files are:
 ### Vosk Model Not Found
 
 Download models from [https://alphacephei.com/vosk/models](https://alphacephei.com/vosk/models) and extract the ZIP archives to `models/` directory.
+
+### NeMo on Windows (SIGKILL Error)
+
+NeMo uses `signal.SIGKILL` which doesn't exist on Windows. To fix:
+
+1. Locate the file `.venv\Lib\site-packages\nemo\utils\exp_manager.py`
+2. Find line ~170: `rank_termination_signal: signal.Signals = signal.SIGKILL`
+3. Replace with: `rank_termination_signal: signal.Signals = signal.SIGTERM if not hasattr(signal, 'SIGKILL') else signal.SIGKILL`
+
+Or run this one-liner:
+```powershell
+(Get-Content .venv\Lib\site-packages\nemo\utils\exp_manager.py) -replace 'signal\.SIGKILL', 'signal.SIGTERM if not hasattr(signal, "SIGKILL") else signal.SIGKILL' | Set-Content .venv\Lib\site-packages\nemo\utils\exp_manager.py
+```
+
+> **Note**: This patch is local to your venv and will be lost if you reinstall nemo_toolkit.
 
 ## License
 

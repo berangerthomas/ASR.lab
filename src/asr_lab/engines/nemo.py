@@ -52,15 +52,21 @@ class NeMoEngine(ASREngine):
         
         elapsed = time.time() - start_time
 
-        # Extract the transcription text - handle Hypothesis objects
-        if transcriptions and hasattr(transcriptions[0], 'text'):
-            # If it's a Hypothesis object with a text attribute
-            text = transcriptions[0].text
-        elif transcriptions:
-            # If it's already a string
-            text = transcriptions[0]
-        else:
-            text = ""
+        # Extract the transcription text - handle various return formats
+        text = ""
+        if transcriptions:
+            result = transcriptions[0]
+            # Handle Hypothesis objects with text attribute
+            if hasattr(result, 'text'):
+                text = result.text
+            # Handle nested list (some models return [[text]])
+            elif isinstance(result, list) and result:
+                text = result[0] if isinstance(result[0], str) else str(result[0])
+            # Handle direct string
+            elif isinstance(result, str):
+                text = result
+            else:
+                text = str(result)
 
         return TranscriptionResult(
             text=text,

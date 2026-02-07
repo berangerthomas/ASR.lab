@@ -15,7 +15,6 @@ class BenchmarkMeta(BaseModel):
 class DataConfig(BaseModel):
     audio_source_dir: str = "data/audio"
     processed_dir: str = "data/processed"
-    reference_dir: str = "data/references"
 
 class NormalizationConfig(BaseModel):
     name: str

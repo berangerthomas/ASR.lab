@@ -37,78 +37,51 @@ class DataManager:
         # Get data paths from config
         config = self.config_loader.get_config()
         audio_source_dir = Path(config.data.audio_source_dir)
-        reference_dir = Path(config.data.reference_dir)
         processed_dir = Path(config.data.processed_dir)
         processed_dir.mkdir(exist_ok=True, parents=True)
 
         # Collect all tasks to be done
         tasks = []
         
-        # Find all audio files in the source directory
-        # Check for manifest file first
+        # Load audio files from manifest (required)
         manifest_path = audio_source_dir / "manifest.json"
+        if not manifest_path.exists():
+            raise FileNotFoundError(f"Manifest file required but not found: {manifest_path}")
+        
         audio_files = []
+        logger.info(f"Loading dataset from manifest: {manifest_path}")
         
-        if manifest_path.exists():
-            logger.info(f"Loading dataset from manifest: {manifest_path}")
-            try:
-                with open(manifest_path, 'r', encoding='utf-8') as f:
-                    manifest_data = json.load(f)
-                    # Expecting list of dicts: [{"audio_filepath": "...", "text": "...", "lang": "..."}]
-                    for item in manifest_data:
-                        audio_path = Path(item.get("audio_filepath"))
-                        if not audio_path.is_absolute():
-                            audio_path = audio_source_dir / audio_path
-                        
-                        if audio_path.exists():
-                            audio_files.append({
-                                "path": audio_path,
-                                "text": item.get("text"),
-                                "lang": item.get("lang")
-                            })
-                        else:
-                            logger.warning(f"Audio file in manifest not found: {audio_path}")
-            except Exception as e:
-                logger.error(f"Failed to load manifest: {e}")
+        with open(manifest_path, 'r', encoding='utf-8') as f:
+            manifest_data = json.load(f)
         
-        # Fallback to glob if no manifest or empty
-        if not audio_files:
-            logger.info("No manifest found or loaded. Falling back to file globbing.")
-            for f in audio_source_dir.glob("*.wav"):
-                audio_files.append({"path": f})
+        # Expecting list of dicts: [{"audio_filepath": "...", "text": "...", "lang": "..."}]
+        for item in manifest_data:
+            # All fields are required
+            if "audio_filepath" not in item or "text" not in item or "lang" not in item:
+                logger.warning(f"Skipping incomplete manifest entry (requires audio_filepath, text, lang): {item}")
+                continue
+            
+            audio_path = Path(item["audio_filepath"])
+            if not audio_path.is_absolute():
+                audio_path = audio_source_dir / audio_path
+            
+            if audio_path.exists():
+                audio_files.append({
+                    "path": audio_path,
+                    "text": item["text"],
+                    "lang": item["lang"]
+                })
+            else:
+                logger.warning(f"Audio file in manifest not found: {audio_path}")
         
         if not audio_files:
-            logger.warning(f"No audio files found in {audio_source_dir}")
+            logger.warning(f"No valid audio files found in manifest {manifest_path}")
             return []
 
         for item in audio_files:
             source_audio_path = item["path"]
-            
-            # Determine language and reference text
-            if "lang" in item:
-                lang_code = item["lang"]
-            else:
-                # Fallback to filename convention
-                try:
-                    lang_code = source_audio_path.stem.split('_')[0]
-                except IndexError:
-                    logger.warning(f"Skipping file with invalid naming convention: {source_audio_path.name}")
-                    continue
-            
-            if "text" in item:
-                reference_text = item["text"]
-            else:
-                # Fallback to text file
-                reference_text_path = reference_dir / f"{source_audio_path.stem}.txt"
-                if not reference_text_path.is_file():
-                    logger.warning(f"Reference text not found for audio file: {source_audio_path}")
-                    continue
-                try:
-                    with open(reference_text_path, 'r', encoding='utf-8') as f:
-                        reference_text = f.read().strip()
-                except Exception as e:
-                    logger.error(f"Could not read reference text at {reference_text_path}: {e}")
-                    continue
+            lang_code = item["lang"]
+            reference_text = item["text"]
 
             # Add original task
             tasks.append({

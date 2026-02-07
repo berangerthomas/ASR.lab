@@ -12,6 +12,10 @@ logger = logging.getLogger(__name__)
 class ResultManager:
     """
     Manages the storage, export, and reporting of benchmark results.
+    
+    Results are stored in JSON with pre-computed metrics for all
+    normalization variants. The interactive HTML report allows
+    switching between normalization options via checkboxes.
     """
 
     def __init__(self, config_loader: ConfigLoader):
@@ -19,13 +23,16 @@ class ResultManager:
         self.output_dir = Path("results")
         
         # Use config file name as subdirectory for reports
-        config_name = config_loader.config_path.stem  # e.g., "quick_test" from "quick_test.yaml"
-        self.reports_dir = self.output_dir / "reports" / config_name
+        self.config_name = config_loader.config_path.stem  # e.g., "quick_test" from "quick_test.yaml"
+        self.reports_dir = self.output_dir / "reports" / self.config_name
         self.reports_dir.mkdir(exist_ok=True, parents=True)
 
     def save_results(self, results: List[Dict[str, Any]]) -> None:
         """
-        Saves the raw results to JSON and exports to other formats.
+        Saves the raw results to JSON.
+        
+        Results include pre-computed metrics_variants for all 8 normalization
+        combinations, allowing the HTML report to switch between them.
         """
         logger.info(f"Saving {len(results)} results...")
         

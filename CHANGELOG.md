@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.0.0] - 2026-02-06
+
+### Added
+
+#### Text Normalization as Grid Search Dimension
+- **Systematic text normalization**: Each transcription generates 2 results (raw + normalized)
+- Normalized preset: lowercase + remove punctuation + normalize spaces
+- Diff view shows both raw and normalized texts, if selected
+
+#### Text normalizations
+- Configurable text transforms: `ToLowerCase()`, `RemovePunctuation()`, `ExpandCommonEnglishContractions()`
+- Metrics and transforms computed consistently with jiwer library
+
+### Visual Encoding
+- **Symbol** = Degradation type (circle = original, diamond = reverb, etc.)
+- **Color** = Engine (whisper = blue, nemo = purple, etc.)
+- **Size** = Text normalization (normalized = large, raw = small)
+
+### Changed
+- **wav2vec2 engine**: Output normalized to lowercase (was outputting uppercase)
+
+---
+
 ## [0.8.0] - 2026-02-04
 
 ### Added
@@ -59,8 +82,8 @@
 ### Known Issues
 - NeMo: `signal.SIGKILL` not available on Windows
 - HuBERT: uses Wav2Vec2 tokenizer fallback
-- HuBERT: outputs uppercase text
-- No text normalization before metric computation
+- ~~HuBERT: outputs uppercase text~~ (fixed in 1.0.0: lowercase applied)
+- ~~No text normalization before metric computation~~ (fixed in 1.0.0)
 
 ### Features
 - Multi-language support (en, fr, de, es)

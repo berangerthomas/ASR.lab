@@ -10,6 +10,7 @@ from ..config.metric_registry import METRIC_REGISTRY
 from ..engines.base import ASREngine
 from ..metrics.base import Metric
 from ..results.manager import ResultManager
+from ..results.metrics_compute import TEXT_NORM_PRESETS, compute_with_text_norm_presets
 from .data_manager import DataManager
 
 logger = logging.getLogger(__name__)
@@ -84,44 +85,51 @@ class BenchmarkRunner:
         results = []
         for dataset in tqdm(datasets, desc=f"Evaluating {engine.name}"):
             try:
-                result = self._process_single_item(engine, dataset)
-                if result:
-                    results.append(result)
+                # Returns a list of results (one per text normalization preset)
+                result_list = self._process_single_item(engine, dataset)
+                if result_list:
+                    results.extend(result_list)
             except Exception as e:
                 logger.error(f"Error processing {dataset['name']} with {engine.name}: {e}")
         return results
 
-    def _process_single_item(self, engine: ASREngine, dataset: Dict[str, Any]) -> Dict[str, Any]:
+    def _process_single_item(self, engine: ASREngine, dataset: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
         Process a single dataset item with a specific engine.
-        This method is thread-safe if the engine's transcribe method is thread-safe.
+        
+        Returns one result per text normalization preset, enabling grid search
+        over text normalization options.
         """
         # Skip if language not supported by engine (if engine has language constraints)
         # This logic could be added here if engines expose supported languages
 
         transcription_result = engine.transcribe(dataset["audio_path"], dataset["language"])
 
-        metrics_results = {}
-        for metric in self.metrics:
-            try:
-                metrics_results[metric.name] = metric.compute(
-                    prediction=transcription_result.text, reference=dataset["reference_text"]
-                )
-            except Exception as e:
-                logger.warning(f"Metric {metric.name} failed: {e}")
-                metrics_results[metric.name] = None
-
-        return {
-            "dataset": dataset["name"],
-            "engine": engine.name,
-            "language": dataset.get("language", "unknown"),
-            "degradation": dataset.get("degradation", "None"),
-            "enhancement": dataset.get("enhancement", "None"),
-            "normalization": dataset.get("normalization", "None"),
-            "transcription": transcription_result.model_dump(),
-            "metrics": metrics_results,
-            "reference_text": dataset["reference_text"],
-        }
+        # Compute metrics for all text normalization presets
+        norm_results = compute_with_text_norm_presets(
+            hypothesis=transcription_result.text,
+            reference=dataset["reference_text"]
+        )
+        
+        results = []
+        for norm in norm_results:
+            results.append({
+                "dataset": dataset["name"],
+                "engine": engine.name,
+                "language": dataset.get("language", "unknown"),
+                "degradation": dataset.get("degradation", "None"),
+                "enhancement": dataset.get("enhancement", "None"),
+                "audio_norm": dataset.get("normalization", "None"),  # Audio normalization (LUFS)
+                "text_norm": norm["text_norm"],  # Text normalization preset
+                "text_norm_display": norm["text_norm_display"],
+                "transcription": transcription_result.model_dump(),
+                "metrics": norm["metrics"],
+                "reference_text": dataset["reference_text"],
+                "reference_normalized": norm["reference_normalized"],
+                "hypothesis_normalized": norm["hypothesis_normalized"],
+            })
+        
+        return results
 
     def _initialize_engines(self) -> List[ASREngine]:
         """Initializes the ASR engines specified in the config."""

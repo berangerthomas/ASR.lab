@@ -46,6 +46,9 @@ class Wav2Vec2Engine(ASREngine):
         predicted_ids = torch.argmax(logits, dim=-1)
         text = self.processor.batch_decode(predicted_ids, skip_special_tokens=True)[0]
         
+        # Wav2Vec2 models trained on LibriSpeech output UPPERCASE - normalize to lowercase
+        text = text.lower()
+        
         elapsed = time.time() - start_time
 
         return TranscriptionResult(

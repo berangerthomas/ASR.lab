@@ -1,17 +1,23 @@
 import time
+import logging
 import torch
-import numpy as np
+import librosa
 from pathlib import Path
 from typing import Dict, Any
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor
 
 from .base import ASREngine
 from ..core.models import EngineConfig, TranscriptionResult
-from ..audio.loader import load_audio
+
+logger = logging.getLogger(__name__)
+
 
 class WhisperEngine(ASREngine):
     """
     An ASR engine implementation for the OpenAI Whisper model family.
+    
+    Uses the native Whisper long-form transcription with sequential decoding
+    for accurate handling of audio files of any length.
     """
 
     def __init__(self, config: EngineConfig):
@@ -20,7 +26,7 @@ class WhisperEngine(ASREngine):
         if not self.model_id:
             raise ValueError("WhisperEngine config must include a 'model_id' or 'model_name'")
         
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
         self.torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
         
         self.model = None
@@ -32,6 +38,8 @@ class WhisperEngine(ASREngine):
             raise ValueError("Model ID cannot be None.")
             
         if self.model is None:
+            logger.info(f"Loading Whisper model: {self.model_id}")
+            
             self.model = AutoModelForSpeechSeq2Seq.from_pretrained(
                 self.model_id,
                 torch_dtype=self.torch_dtype,
@@ -40,6 +48,8 @@ class WhisperEngine(ASREngine):
             ).to(self.device)
             
             self.processor = AutoProcessor.from_pretrained(self.model_id)
+            
+            logger.info(f"Whisper model loaded on {self.device}")
             
     def unload_model(self) -> None:
         """Unloads the model to free memory."""
@@ -54,119 +64,65 @@ class WhisperEngine(ASREngine):
             torch.cuda.empty_cache()
 
     def transcribe(self, audio_path: Path, language: str) -> TranscriptionResult:
-        """Transcribes an audio file using the loaded Whisper model directly (bypassing pipeline)."""
+        """
+        Transcribes an audio file using Whisper's native long-form transcription.
+        
+        Uses sequential decoding with condition_on_prev_tokens for accurate
+        transcription of audio files of any length.
+        """
         if self.model is None:
             self.load_model()
         
         start_time = time.time()
         
-        # Load audio using centralized loader
-        audio_data, sr = load_audio(audio_path, target_sr=16000)
+        try:
+            # Load audio with librosa (handles all formats, resamples to 16kHz)
+            audio, sr = librosa.load(str(audio_path), sr=16000)
+            
+            # Process audio WITHOUT truncation for long-form support
+            inputs = self.processor(
+                audio,
+                sampling_rate=16000,
+                return_tensors="pt",
+                truncation=False,
+                padding="longest",
+                return_attention_mask=True
+            ).to(self.device)
+            
+            # Prepare generation arguments
+            generate_kwargs = {
+                "return_timestamps": True,  # Required for long-form
+                "condition_on_prev_tokens": True,  # Sequential decoding
+            }
+            
+            if language:
+                generate_kwargs["language"] = language
+                generate_kwargs["task"] = "transcribe"
+            
+            # Add attention mask if available
+            if hasattr(inputs, "attention_mask") and inputs.attention_mask is not None:
+                generate_kwargs["attention_mask"] = inputs.attention_mask
+            
+            # Generate transcription
+            generated_ids = self.model.generate(
+                inputs.input_features,
+                **generate_kwargs
+            )
+            
+            text = self.processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
+            
+        except Exception as e:
+            logger.error(f"Error transcribing {audio_path}: {e}")
+            text = ""
         
-        # Prepare generation arguments
-        generate_kwargs = {}
-        if language:
-            generate_kwargs["language"] = language
-            generate_kwargs["task"] = "transcribe"
-        
-        chunk_length_s = getattr(self.config, "chunk_length_s", None)
-        
-        full_text = []
-        
-        if chunk_length_s:
-            # Smart chunking (split on silence)
-            for chunk_audio in self._smart_split(audio_data, sr, chunk_length_s):
-                if len(chunk_audio) < sr * 0.1: # Skip tiny chunks
-                    continue
-                    
-                try:
-                    # Process chunk directly
-                    inputs = self.processor(chunk_audio, sampling_rate=sr, return_tensors="pt").to(self.device)
-                    
-                    # Generate
-                    with torch.no_grad():
-                        predicted_ids = self.model.generate(inputs.input_features, **generate_kwargs)
-                    
-                    # Decode
-                    transcription = self.processor.batch_decode(predicted_ids, skip_special_tokens=True)[0]
-                    
-                    if transcription:
-                        full_text.append(transcription.strip())
-                except Exception as e:
-                    print(f"Error processing chunk: {e}")
-        else:
-            # No chunking (might truncate if > 30s)
-            try:
-                inputs = self.processor(audio_data, sampling_rate=sr, return_tensors="pt").to(self.device)
-                
-                with torch.no_grad():
-                    predicted_ids = self.model.generate(inputs.input_features, **generate_kwargs)
-                
-                transcription = self.processor.batch_decode(predicted_ids, skip_special_tokens=True)[0]
-                
-                if transcription:
-                    full_text.append(transcription.strip())
-            except Exception as e:
-                print(f"Error processing audio: {e}")
-
         elapsed = time.time() - start_time
-        final_text = " ".join(full_text)
 
         return TranscriptionResult(
-            text=final_text,
+            text=text,
             processing_time=elapsed,
             confidence=None,
             metadata={"model": self.model_id}
         )
-
-    def _smart_split(self, audio_data, sr, chunk_length_s=30, min_chunk_length_s=25):
-        """
-        Splits audio into chunks, trying to cut at the quietest point 
-        between min_chunk_length_s and chunk_length_s.
-        """
-        total_samples = len(audio_data)
-        chunk_samples = int(chunk_length_s * sr)
-        min_chunk_samples = int(min_chunk_length_s * sr)
-        
-        cursor = 0
-        while cursor < total_samples:
-            # If remaining audio fits in one chunk, take it all
-            if total_samples - cursor <= chunk_samples:
-                yield audio_data[cursor:]
-                break
-            
-            # Define the search window for splitting (e.g. between 25s and 30s)
-            search_start = cursor + min_chunk_samples
-            search_end = cursor + chunk_samples
-            
-            # Extract the search region
-            search_region = audio_data[search_start:search_end]
-            
-            if len(search_region) == 0:
-                # Should not happen due to check above, but safety first
-                yield audio_data[cursor:cursor+chunk_samples]
-                cursor += chunk_samples
-                continue
-
-            # Compute RMS energy to find silence
-            # Frame length 512 (~32ms), hop length 128 (~8ms)
-            try:
-                rms = librosa.feature.rms(y=search_region, frame_length=512, hop_length=128)[0]
-                
-                # Find the frame with minimum energy
-                min_idx = np.argmin(rms)
-                
-                # Convert frame index back to sample index
-                # split_offset is relative to search_start
-                split_offset = min_idx * 128 
-                
-                split_point = search_start + split_offset
-            except Exception:
-                # Fallback if librosa fails
-                split_point = cursor + chunk_samples
-            
-            yield audio_data[cursor:split_point]
-            cursor = split_point
 
     def get_metadata(self) -> Dict[str, Any]:
         """Returns metadata about the Whisper model."""
