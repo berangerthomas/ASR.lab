@@ -233,45 +233,6 @@ Create a `manifest.json` in your audio directory with all audio files and their 
 - Mono channel recommended
 ```
 
-## Extending the Platform
-
-### Adding a New Engine
-
-1. Create a new engine class in `src/asr_lab/engines/`:
-
-```python
-from .base import ASREngine
-from pathlib import Path
-from typing import Dict, Any
-
-class MyEngine(ASREngine):
-    def load_model(self) -> None:
-        # Load model
-        pass
-    
-    def transcribe(self, audio_path: Path, language: str) -> Dict[str, Any]:
-        # Transcribe audio
-        return {
-            "text": transcription,
-            "processing_time": elapsed,
-            "confidence": None
-        }
-    
-    def get_metadata(self) -> Dict[str, Any]:
-        return {"framework": "MyEngine"}
-```
-
-2. Register in `src/asr_lab/config/engine_registry.py`:
-
-```python
-from ..engines.my_engine import MyEngine
-
-ENGINE_REGISTRY = {
-    "my_engine": MyEngine,
-    # ... other engines
-}
-```
-
 ## Performance Considerations
 
 ### GPU Acceleration
@@ -284,14 +245,6 @@ print(torch.cuda.is_available())
 ```
 
 ## Troubleshooting
-
-### ModuleNotFoundError
-
-Install missing dependencies:
-
-```bash
-pip install librosa transformers torch tqdm ruff
-```
 
 ### CUDA Out of Memory
 
@@ -309,7 +262,7 @@ Ensure audio files are:
 Engine-specific prerequisites are handled automatically when running a benchmark:
 
 - **Vosk**: Models listed in the configuration (`model_path`) are downloaded and extracted on the fly if not already present.
-- **NeMo on Windows**: The `signal.SIGKILL` compatibility patch is applied at runtime — no manual file editing required.
+- **NeMo on Windows**: The `signal.SIGKILL` compatibility patch is applied at runtime (exp_manager.py).
 
 Both mechanisms are implemented in `src/asr_lab/setup` (utilities: `engine_setup`, `nemo_patch`, `vosk_setup`). The benchmark runner calls `ensure_engines_ready(...)` before engine initialization so most manual setup steps are no longer necessary.
 
