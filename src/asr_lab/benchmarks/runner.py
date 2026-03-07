@@ -11,6 +11,7 @@ from ..engines.base import ASREngine
 from ..metrics.base import Metric
 from ..results.manager import ResultManager
 from ..results.metrics_compute import TEXT_NORM_PRESETS, compute_with_text_norm_presets
+from ..setup.engine_setup import ensure_engines_ready
 from .data_manager import DataManager
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,7 @@ class BenchmarkRunner:
 
     def __init__(self, config_path: Path):
         self.config_loader = ConfigLoader(config_path)
+        ensure_engines_ready(self.config_loader.get_config())
         self.data_manager = DataManager(self.config_loader)
         self.result_manager = ResultManager(self.config_loader)
         self.engines = self._initialize_engines()

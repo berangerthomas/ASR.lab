@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.1.0] - 2026-03-07
+
+### Added
+
+- Introduce a pre-flight engine setup system and related fixes/enhancements:
+  - Add `src/asr_lab/setup`: `engine_setup`, `nemo_patch`, `vosk_setup` and package `__init__` to prepare engine-specific prerequisites at runtime (NeMo Windows SIGKILL compatibility patch and automatic Vosk model download+extraction).
+  - `BenchmarkRunner` calls `ensure_engines_ready(...)` so engines are prepared before initialization.
+- Update interactive report template: make filters bar sticky with backdrop blur and add `IntersectionObserver` to toggle shadow on scroll.
+
+### Changed
+
+- Improve `SeamlessM4T` engine: detect v2 models, select appropriate model class, and cap generation tokens (`max_new_tokens=256`); minor import adjustments.
+- Move `deepfilternet` into an optional dependency group (`deepfilter`) in `pyproject.toml`.
+
+---
+
 ## [1.0.0] - 2026-02-06
 
 ### Added

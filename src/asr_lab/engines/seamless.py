@@ -50,17 +50,28 @@ class SeamlessM4TEngine(ASREngine):
         self.model = None
         self.processor = None
 
+    def _is_v2(self) -> bool:
+        """Check if the model is SeamlessM4T v2."""
+        return "v2" in self.model_name.lower()
+
     def load_model(self) -> None:
-        """Loads SeamlessM4T model."""
+        """Loads SeamlessM4T model (v1 or v2 depending on model_name)."""
         if self.model is None:
             try:
-                from transformers import SeamlessM4TModel, AutoProcessor
+                from transformers import AutoProcessor
                 import torchaudio
             except ImportError:
                 raise ImportError("transformers>=4.34.0 and torchaudio required for SeamlessM4T")
             
+            if self._is_v2():
+                from transformers import SeamlessM4Tv2ForSpeechToText
+                model_cls = SeamlessM4Tv2ForSpeechToText
+            else:
+                from transformers import SeamlessM4TForSpeechToText
+                model_cls = SeamlessM4TForSpeechToText
+
             self.processor = AutoProcessor.from_pretrained(self.model_name)
-            self.model = SeamlessM4TModel.from_pretrained(self.model_name).to(self.device)
+            self.model = model_cls.from_pretrained(self.model_name).to(self.device)
             self.model.eval()
             self.torchaudio = torchaudio
 
@@ -90,7 +101,11 @@ class SeamlessM4TEngine(ASREngine):
         inputs = self.processor(audio=audio_input.squeeze().numpy(), return_tensors="pt", sampling_rate=16000)
         
         with torch.no_grad():
-            output_tokens = self.model.generate(**inputs.to(self.device), tgt_lang=tgt_lang, generate_speech=False)
+            output_tokens = self.model.generate(
+                **inputs.to(self.device),
+                tgt_lang=tgt_lang,
+                max_new_tokens=256,
+            )
         
         text = self.processor.decode(output_tokens[0].tolist()[0], skip_special_tokens=True)
         

@@ -19,7 +19,7 @@ ASR.lab enables systematic evaluation of speech recognition engines under variou
 
 - **Multi-Engine Support**: Compare performance across different ASR frameworks (Whisper, Wav2Vec2, NeMo, Vosk, SeamlessM4T, etc.)
 - **Audio Degradation**: Apply controlled acoustic degradations (reverb, noise, compression) via VST3 plugins
-- **Audio Enhancement**: Test denoising/enhancement algorithms (Demucs, DeepFilterNet) on degraded audio
+- **Audio Enhancement**: Test denoising/enhancement algorithms (Demucs; DeepFilterNet available via optional extras: `pip install .[deepfilter]`) on degraded audio
 - **Loudness Normalization**: Grid search across different LUFS normalization levels (EBU R128 compliant)
 - **Evaluation Metrics**: WER, CER, MER, WIL, WIP for comprehensive transcription analysis
 - **Interactive Reports**: HTML reports with sortable tables, Plotly visualizations, and multi-filter dropdowns
@@ -43,9 +43,9 @@ Each stage is optional and configurable. Multiple options at each stage create a
 |--------|--------|-------|
 | Whisper (OpenAI) | ✅ Tested | Multilingual, long-form transcription support |
 | Wav2Vec 2.0 (Meta) | ✅ Tested | Language-specific fine-tuning, outputs normalized to lowercase |
-| SeamlessM4T (Meta) | ✅ Tested | Multilingual translation and transcription |
-| NeMo (NVIDIA) | ✅ Tested | Windows support via SIGTERM patch (see below) |
-| Vosk | ✅ Tested | Offline recognition, requires local model |
+| SeamlessM4T (Meta) | ✅ Tested | Detects v2 models, selects appropriate model class, and caps generation tokens (`max_new_tokens=256`) |
+| NeMo (NVIDIA) | ✅ Tested | Windows support via runtime SIGKILL compatibility patch; runtime setup handled automatically |
+| Vosk | ✅ Tested | Offline recognition; models auto-downloaded and extracted when needed |
 | HuBERT (Meta) | ⚠️ Experimental | Uses Wav2Vec2 tokenizer fallback |
 
 ## Evaluation Metrics
@@ -304,24 +304,14 @@ Ensure audio files are:
 - 16kHz sample rate (or configure accordingly)
 - Mono channel
 
-### Vosk Model Not Found
+### Vosk & NeMo — Automatic Setup
 
-Download models from [https://alphacephei.com/vosk/models](https://alphacephei.com/vosk/models) and extract the ZIP archives to `models/` directory.
+Engine-specific prerequisites are handled automatically when running a benchmark:
 
-### NeMo on Windows (SIGKILL Error)
+- **Vosk**: Models listed in the configuration (`model_path`) are downloaded and extracted on the fly if not already present.
+- **NeMo on Windows**: The `signal.SIGKILL` compatibility patch is applied at runtime — no manual file editing required.
 
-NeMo uses `signal.SIGKILL` which doesn't exist on Windows. To fix:
-
-1. Locate the file `.venv\Lib\site-packages\nemo\utils\exp_manager.py`
-2. Find line ~170: `rank_termination_signal: signal.Signals = signal.SIGKILL`
-3. Replace with: `rank_termination_signal: signal.Signals = signal.SIGTERM if not hasattr(signal, 'SIGKILL') else signal.SIGKILL`
-
-Or run this one-liner:
-```powershell
-(Get-Content .venv\Lib\site-packages\nemo\utils\exp_manager.py) -replace 'signal\.SIGKILL', 'signal.SIGTERM if not hasattr(signal, "SIGKILL") else signal.SIGKILL' | Set-Content .venv\Lib\site-packages\nemo\utils\exp_manager.py
-```
-
-> **Note**: This patch is local to your venv and will be lost if you reinstall nemo_toolkit.
+Both mechanisms are implemented in `src/asr_lab/setup` (utilities: `engine_setup`, `nemo_patch`, `vosk_setup`). The benchmark runner calls `ensure_engines_ready(...)` before engine initialization so most manual setup steps are no longer necessary.
 
 ## License
 

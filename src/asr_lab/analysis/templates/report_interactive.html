@@ -33,10 +33,20 @@
             display: flex; 
             gap: 1rem; 
             padding: 1rem 2rem; 
-            background: white; 
+            background: rgba(255, 255, 255, 0.95); 
             border-bottom: 1px solid var(--border-color); 
             align-items: flex-end;
             flex-wrap: wrap;
+            position: sticky;
+            top: 0;
+            z-index: 999;
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            box-shadow: none;
+            transition: box-shadow 0.2s;
+        }
+        .filters-bar.stuck {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
         .custom-select { position: relative; min-width: 180px; }
         .custom-select > label { display: block; font-size: 0.8rem; color: var(--secondary-color); margin-bottom: 0.25rem; font-weight: 600; }
@@ -1190,6 +1200,21 @@
             createMetricsHeatmap();
             createBoxPlot();
         }, 100);
+
+        // Sticky filters bar shadow on scroll
+        const filtersBar = document.querySelector('.filters-bar');
+        if (filtersBar) {
+            const observer = new IntersectionObserver(
+                ([e]) => { filtersBar.classList.toggle('stuck', e.intersectionRatio < 1); },
+                { threshold: [1], rootMargin: '-1px 0px 0px 0px' }
+            );
+            // Create a sentinel element right before .filters-bar
+            const sentinel = document.createElement('div');
+            sentinel.style.height = '1px';
+            sentinel.style.marginBottom = '-1px';
+            filtersBar.parentNode.insertBefore(sentinel, filtersBar);
+            observer.observe(sentinel);
+        }
     })();
     </script>
 </body>

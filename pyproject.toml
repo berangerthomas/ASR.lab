@@ -1,6 +1,6 @@
 [project]
 name = "asr-lab"
-version = "0.8.0"
+version = "1.0.0"
 description = "Benchmarking platform for automatic speech recognition models using controlled audio degradation, multiple evaluation metrics, and comparative analysis across languages and model architectures."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -32,8 +32,12 @@ dependencies = [
     "hf-xet>=1.2.0",
     "pydantic>=2.12.4",
     "demucs>=4.0.1",
-    "deepfilternet>=0.5.6",
     "diffq>=0.2.4",
+]
+
+[project.optional-dependencies]
+deepfilter = [
+    "deepfilternet>=0.5.6",
 ]
 
 [build-system]
