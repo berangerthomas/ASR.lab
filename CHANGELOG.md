@@ -88,13 +88,6 @@
 - NeMo engine: does not work on Windows (SIGKILL)
 - HuBERT engine: uses Wav2Vec2 tokenizer fallback
 
-### Not Implemented
-- Kaldi engine (requires external installation)
-- USM engine (API not available)
-- BLEU, Perplexity, RTF, Latency metrics
-- Matplotlib visualizations
-- Statistical analysis
-
 ### Known Issues
 - NeMo: `signal.SIGKILL` not available on Windows
 - HuBERT: uses Wav2Vec2 tokenizer fallback
