@@ -38,7 +38,7 @@ def run(config_path: Path):
         else:
             click.echo("\n✅ Benchmark finished successfully!")
         
-        click.echo(f"\n📊 Report available at: results/reports/{config_name}/report_interactive.html")
+        click.echo(f"\n📊 Report available at: results/reports/{config_name}/report_{config_name}.html")
         
     except RuntimeError as e:
         click.echo(f"\n❌ Benchmark failed: {e}", err=True)
@@ -110,8 +110,7 @@ def report(results_path: Path):
         report_generator.generate_report()
         
         click.echo("\n✅ Report generated successfully!")
-        click.echo(f"\n📊 Report available at: {reports_dir / 'report_interactive.html'}")
-        click.echo("\n💡 Use checkboxes in the report to switch normalization options.")
+        click.echo(f"\n📊 Report available at: {reports_dir / f'report_{reports_dir.name}.html'}")
 
     except Exception as e:
         click.echo(f"❌ Error generating report: {e}", err=True)

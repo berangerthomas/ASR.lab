@@ -20,14 +20,14 @@ logger = logging.getLogger(__name__)
 # These are applied as a grid search dimension, like degradation or enhancement
 TEXT_NORM_PRESETS = {
     'raw': {
-        'display_name': 'Brut',
+        'display_name': 'Raw',
         'lowercase': False,
         'remove_punctuation': False,
         'normalize_spaces': False,
         'expand_contractions': False,
     },
     'normalized': {
-        'display_name': 'Normalisé',
+        'display_name': 'Normalized',
         'lowercase': True,
         'remove_punctuation': True,
         'normalize_spaces': True,

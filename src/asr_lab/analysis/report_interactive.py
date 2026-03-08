@@ -45,6 +45,19 @@ class InteractiveReportGenerator:
             },
         }
 
+    @staticmethod
+    def _fmt_metric(val, precision=4):
+        """Format metric values, handling None and NaN."""
+        if val is None:
+            return "N/A"
+        try:
+            import pandas as pd
+            if pd.isna(val):
+                return "N/A"
+            return f"{float(val):.{precision}f}"
+        except (ValueError, TypeError):
+            return "N/A"
+
     def generate_report(self):
         """
         Renders a complete interactive HTML report with embedded Plotly charts.
@@ -80,7 +93,8 @@ class InteractiveReportGenerator:
         html_content = template.render(template_data)
 
         # Save the report
-        report_path = self.output_dir / "report_interactive.html"
+        report_filename = f"report_{self.output_dir.name}.html"
+        report_path = self.output_dir / report_filename
         with open(report_path, 'w', encoding='utf-8') as f:
             f.write(html_content)
         
@@ -214,32 +228,21 @@ class InteractiveReportGenerator:
                                 audio_norm_label = f" + {audio_norm}" if audio_norm != "None" else ""
                                 text_norm_label = f" [{text_norm}]"
                                 
-                                # Helper function to format metric values (handles None and NaN)
-                                def fmt_metric(val, precision=4):
-                                    if val is None:
-                                        return "N/A"
-                                    try:
-                                        import pandas as pd
-                                        if pd.isna(val):
-                                            return "N/A"
-                                        return f"{float(val):.{precision}f}"
-                                    except (ValueError, TypeError):
-                                        return "N/A"
-                                
                                 # Safe column access for optional metrics
                                 cer_vals = subset['cer'] if 'cer' in subset.columns else [None] * len(subset)
                                 mer_vals = subset['mer'] if 'mer' in subset.columns else [None] * len(subset)
                                 wil_vals = subset['wil'] if 'wil' in subset.columns else [None] * len(subset)
                                 wip_vals = subset['wip'] if 'wip' in subset.columns else [None] * len(subset)
                                 
+                                fmt = self._fmt_metric
                                 hover_text = [
                                     f"<b>{engine}</b><br>" +
-                                    f"WER: {fmt_metric(wer)}<br>" +
-                                    f"CER: {fmt_metric(cer)}<br>" +
-                                    f"MER: {fmt_metric(mer)}<br>" +
-                                    f"WIL: {fmt_metric(wil)}<br>" +
-                                    f"WIP: {fmt_metric(wip)}<br>" +
-                                    f"Time: {fmt_metric(time_s, 2)}s<br>" +
+                                    f"WER: {fmt(wer)}<br>" +
+                                    f"CER: {fmt(cer)}<br>" +
+                                    f"MER: {fmt(mer)}<br>" +
+                                    f"WIL: {fmt(wil)}<br>" +
+                                    f"WIP: {fmt(wip)}<br>" +
+                                    f"Time: {fmt(time_s, 2)}s<br>" +
                                     f"Degradation: {degradation}<br>" +
                                     f"Enhancement: {enhancement}<br>" +
                                     f"Audio Norm: {audio_norm}<br>" +
@@ -381,7 +384,7 @@ class InteractiveReportGenerator:
             
             # Text normalization preset
             text_norm = res.get("text_norm", "raw")
-            text_norm_display = res.get("text_norm_display", "Brut (aucune)")
+            text_norm_display = res.get("text_norm_display", "Raw (none)")
             
             if not degradation:
                 is_pristine = "original" in res["dataset"]
