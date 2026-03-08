@@ -111,7 +111,7 @@ benchmark:
   description: "Description of the benchmark"
 
 data:
-  audio_source_dir: "data/audio"
+  audio_source_dir: "data/audio"      # Directory, file, or glob pattern
   processed_dir: "data/processed"
 
 audio_processing:
@@ -203,9 +203,19 @@ Open `results/reports/<config>/report_interactive.html` in a web browser. The re
 
 ## Data Organization
 
-### Manifest File (Required)
+### Manifest Files
 
-Create a `manifest.json` in your audio directory with all audio files and their reference transcriptions:
+Manifest files are JSON files listing audio samples and their reference transcriptions.
+
+The `audio_source_dir` config value supports three modes:
+
+| Mode | Example | Behavior |
+|------|---------|----------|
+| Directory | `audio_source_dir: "data/audio"` | Loads all `*.json` files in the directory |
+| Single file | `audio_source_dir: "data/audio/manifest_en.json"` | Loads that file only |
+| Glob pattern | `audio_source_dir: "data/audio/manifest_fr*.json"` | Loads all matching `.json` files |
+
+Each manifest is a JSON array:
 
 ```json
 [
@@ -231,7 +241,6 @@ Create a `manifest.json` in your audio directory with all audio files and their 
 - WAV format recommended
 - 16kHz sample rate (or configure in `audio_processing.sample_rate`)
 - Mono channel recommended
-```
 
 ## Performance Considerations
 

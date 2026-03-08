@@ -25,7 +25,28 @@ class DataManager:
         self.audio_degradation = self._initialize_audio_degradation()
         self.audio_enhancers = self._initialize_audio_enhancers()
         self.audio_normalizer = AudioNormalizer()
-        
+
+    @staticmethod
+    def _resolve_manifest_paths(audio_source: Path) -> List[Path]:
+        """Resolve manifest .json file paths from audio_source_dir config value.
+
+        Supports three modes:
+          - Directory: all .json files in the directory
+          - Single file: the file itself
+          - Glob pattern (contains * or ?): matching .json files
+        """
+        source_str = str(audio_source)
+        if '*' in source_str or '?' in source_str:
+            # Glob pattern
+            paths = sorted(Path().glob(source_str))
+            return [p for p in paths if p.suffix == '.json' and p.is_file()]
+        elif audio_source.is_file():
+            return [audio_source]
+        elif audio_source.is_dir():
+            return sorted(audio_source.glob('*.json'))
+        else:
+            return []
+
     def prepare_datasets(self) -> List[Dict[str, Any]]:
         """
         Prepares the audio datasets for benchmarking, including degradations and enhancements.
@@ -36,46 +57,51 @@ class DataManager:
         
         # Get data paths from config
         config = self.config_loader.get_config()
-        audio_source_dir = Path(config.data.audio_source_dir)
+        audio_source = Path(config.data.audio_source_dir)
         processed_dir = Path(config.data.processed_dir)
         processed_dir.mkdir(exist_ok=True, parents=True)
 
         # Collect all tasks to be done
         tasks = []
-        
-        # Load audio files from manifest (required)
-        manifest_path = audio_source_dir / "manifest.json"
-        if not manifest_path.exists():
-            raise FileNotFoundError(f"Manifest file required but not found: {manifest_path}")
-        
+
+        # Resolve manifest files from audio_source_dir:
+        #   - directory: load all .json files in it
+        #   - single file: load that file only
+        #   - glob pattern (contains * or ?): expand and load matching .json files
+        manifest_paths = self._resolve_manifest_paths(audio_source)
+        if not manifest_paths:
+            raise FileNotFoundError(f"No manifest .json files found for: {audio_source}")
+
         audio_files = []
-        logger.info(f"Loading dataset from manifest: {manifest_path}")
-        
-        with open(manifest_path, 'r', encoding='utf-8') as f:
-            manifest_data = json.load(f)
-        
-        # Expecting list of dicts: [{"audio_filepath": "...", "text": "...", "lang": "..."}]
-        for item in manifest_data:
-            # All fields are required
-            if "audio_filepath" not in item or "text" not in item or "lang" not in item:
-                logger.warning(f"Skipping incomplete manifest entry (requires audio_filepath, text, lang): {item}")
-                continue
-            
-            audio_path = Path(item["audio_filepath"])
-            if not audio_path.is_absolute():
-                audio_path = audio_source_dir / audio_path
-            
-            if audio_path.exists():
-                audio_files.append({
-                    "path": audio_path,
-                    "text": item["text"],
-                    "lang": item["lang"]
-                })
-            else:
-                logger.warning(f"Audio file in manifest not found: {audio_path}")
-        
+        for manifest_path in manifest_paths:
+            manifest_dir = manifest_path.parent
+            logger.info(f"Loading dataset from manifest: {manifest_path}")
+
+            with open(manifest_path, 'r', encoding='utf-8') as f:
+                manifest_data = json.load(f)
+
+            # Expecting list of dicts: [{"audio_filepath": "...", "text": "...", "lang": "..."}]
+            for item in manifest_data:
+                # All fields are required
+                if "audio_filepath" not in item or "text" not in item or "lang" not in item:
+                    logger.warning(f"Skipping incomplete manifest entry (requires audio_filepath, text, lang): {item}")
+                    continue
+
+                audio_path = Path(item["audio_filepath"])
+                if not audio_path.is_absolute():
+                    audio_path = manifest_dir / audio_path
+
+                if audio_path.exists():
+                    audio_files.append({
+                        "path": audio_path,
+                        "text": item["text"],
+                        "lang": item["lang"]
+                    })
+                else:
+                    logger.warning(f"Audio file in manifest not found: {audio_path}")
+
         if not audio_files:
-            logger.warning(f"No valid audio files found in manifest {manifest_path}")
+            logger.warning(f"No valid audio files found in manifests for {audio_source}")
             return []
 
         for item in audio_files:
