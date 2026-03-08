@@ -107,7 +107,7 @@ class SeamlessM4TEngine(ASREngine):
                 max_new_tokens=256,
             )
         
-        text = self.processor.decode(output_tokens[0].tolist()[0], skip_special_tokens=True)
+        text = self.processor.decode(output_tokens[0].tolist(), skip_special_tokens=True)
         
         elapsed = time.time() - start_time
 
