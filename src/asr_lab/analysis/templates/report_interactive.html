@@ -413,17 +413,48 @@
             <!-- Tab 3: Detailed Analysis (Transcriptions) -->
             <div class="tab-content" id="tab-analysis">
                 <!-- Diff View Selector -->
-                <div class="control-bar">
-                    <label>Diff View:</label>
-                    <div class="metric-radio-group" id="diff-view-radios">
-                        <label title="Word alignment - used for WER, MER, WIL, WIP metrics">
-                            <input type="radio" name="diff-view" value="words" checked>
-                            <span>Word-Level</span>
-                        </label>
-                        <label title="Character alignment - used for CER metric">
-                            <input type="radio" name="diff-view" value="chars">
-                            <span>Character-Level</span>
-                        </label>
+                <div class="control-bar" style="justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                        <label>Diff View:</label>
+                        <div class="metric-radio-group" id="diff-view-radios">
+                            <label title="Word alignment - used for WER, MER, WIL, WIP metrics">
+                                <input type="radio" name="diff-view" value="words" checked>
+                                <span>Word-Level</span>
+                            </label>
+                            <label title="Character alignment - used for CER metric">
+                                <input type="radio" name="diff-view" value="chars">
+                                <span>Character-Level</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <label style="font-weight: 600; color: var(--secondary-color); font-size: 0.9rem;">Sort by:</label>
+                        <div class="metric-radio-group" id="sort-metric-radios">
+                            <label title="Word Error Rate">
+                                <input type="radio" name="sort-metric" value="wer" checked>
+                                <span>WER</span>
+                            </label>
+                            <label title="Character Error Rate">
+                                <input type="radio" name="sort-metric" value="cer">
+                                <span>CER</span>
+                            </label>
+                            <label title="Match Error Rate">
+                                <input type="radio" name="sort-metric" value="mer">
+                                <span>MER</span>
+                            </label>
+                            <label title="Word Information Lost">
+                                <input type="radio" name="sort-metric" value="wil">
+                                <span>WIL</span>
+                            </label>
+                            <label title="Word Information Preserved">
+                                <input type="radio" name="sort-metric" value="wip">
+                                <span>WIP</span>
+                            </label>
+                            <label title="Processing time">
+                                <input type="radio" name="sort-metric" value="time">
+                                <span>Time</span>
+                            </label>
+                        </div>
                     </div>
                 </div>
                 
@@ -435,7 +466,13 @@
                      data-enhancement="{{ result.enhancement or 'None' }}"
                      data-audio-norm="{{ result.audio_norm or 'None' }}"
                      data-text-norm="{{ result.text_norm or 'raw' }}"
-                     data-index="{{ loop.index0 }}">
+                     data-index="{{ loop.index0 }}"
+                     data-wer="{{ result.wer if result.wer is number else '' }}"
+                     data-cer="{{ result.cer if result.cer is number else '' }}"
+                     data-mer="{{ result.mer if result.mer is number else '' }}"
+                     data-wil="{{ result.wil if result.wil is number else '' }}"
+                     data-wip="{{ result.wip if result.wip is number else '' }}"
+                     data-time="{{ result.time_s if result.time_s is number else '' }}">
                     <div class="transcription-header">
                         <div>
                             <strong>{{ result.engine }}</strong> • 
@@ -456,6 +493,14 @@
                                 {% endif %}
                             </span>
                             {% endfor %}
+                            <span class="metric-stat" data-metric="time">
+                                <strong>Time:</strong> 
+                                {% if result.time_s is number %}
+                                <span class="metric-value">{{ "%.2f"|format(result.time_s) }}s</span>
+                                {% else %}
+                                <span class="metric-value">-</span>
+                                {% endif %}
+                            </span>
                         </div>
                     </div>
                     <div class="transcription-body">
@@ -926,6 +971,23 @@
         }
         
         diffViewRadios.forEach(radio => radio.addEventListener('change', updateDiffView));
+
+        // ============ SORT TRANSCRIPTION CARDS ============
+        const sortMetricRadios = document.querySelectorAll('input[name="sort-metric"]');
+        function sortTranscriptionCards() {
+            const metric = document.querySelector('input[name="sort-metric"]:checked').value;
+            const container = document.getElementById('transcriptions-container');
+            const cards = Array.from(container.querySelectorAll('.transcription-card'));
+            cards.sort((a, b) => {
+                    const aVal = a.dataset[metric] !== '' ? parseFloat(a.dataset[metric]) : Infinity;
+                    const bVal = b.dataset[metric] !== '' ? parseFloat(b.dataset[metric]) : Infinity;
+                    if (metric === 'wip') return bVal - aVal; // WIP: higher is better
+                    return aVal - bVal; // Others: lower is better
+                });
+            cards.forEach(card => container.appendChild(card));
+        }
+        sortMetricRadios.forEach(radio => radio.addEventListener('change', sortTranscriptionCards));
+        sortTranscriptionCards();
 
         // ============ METRICS HEATMAP ============
         function createMetricsHeatmap() {
