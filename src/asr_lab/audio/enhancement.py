@@ -100,17 +100,13 @@ class DemucsEnhancer(AudioEnhancer):
 
         vocals = sources[0, vocals_idx].cpu()
         
-        # Resample back to original SR if needed, or keep at model SR?
-        # Usually ASR engines expect 16k. If we save at 44.1k, the ASR engine might handle it or not.
-        # But our AudioProcessor standardizes to 16k.
-        # Let's resample back to 16k (or original sr) to be consistent with the pipeline.
-        # if self.model.samplerate != sr:
-        #     import julius
-        #     vocals = julius.resample_frac(vocals, self.model.samplerate, sr)
+        # Convert to mono by averaging channels (ASR engines expect mono input)
+        if vocals.ndim > 1 and vocals.shape[0] > 1:
+            vocals = vocals.mean(dim=0)
 
         # Save using soundfile
-        # vocals shape is (channels, time), sf.write expects (time, channels)
-        sf.write(str(output_path), vocals.t().numpy(), sr)
+        # vocals is now (time,) mono
+        sf.write(str(output_path), vocals.numpy(), sr)
 
 class DeepFilterNetEnhancer(AudioEnhancer):
     """Wrapper for DeepFilterNet noise suppression."""
