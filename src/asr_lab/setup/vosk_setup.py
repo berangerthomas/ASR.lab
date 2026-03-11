@@ -1,6 +1,7 @@
 """Automatic download and extraction of Vosk models."""
 
 import logging
+import os
 import shutil
 import tempfile
 import urllib.request
@@ -86,6 +87,7 @@ def ensure_vosk_model(model_path: str) -> bool:
     # Use a temporary file next to the target so we stay on the same
     # filesystem (avoids cross-device rename issues).
     tmp_fd, tmp_path = tempfile.mkstemp(suffix=".zip", dir=parent_dir)
+    os.close(tmp_fd)  # close immediately; _download_with_progress opens by path
     tmp_file = Path(tmp_path)
 
     try:
