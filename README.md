@@ -46,8 +46,8 @@ Each stage is optional and configurable. Multiple options at each stage create a
 | SeamlessM4T (Meta) | ✅ Tested | Detects v2 models, selects appropriate model class, and caps generation tokens (`max_new_tokens=256`) |
 | NeMo (NVIDIA) | ✅ Tested | Windows support via runtime SIGKILL compatibility patch; runtime setup handled automatically |
 | Vosk | ✅ Tested | Offline recognition; models auto-downloaded and extracted when needed |
-| Moonshine (Useful Sensors) | ✅ Available | English-only; on-device, very low footprint; models: `moonshine-tiny`, `moonshine-base` |
-| SenseVoice (Alibaba / FunAudio) | ✅ Available | Multilingual (`zh`, `en`, `ja`, `ko`, `yue`), auto language detection, emotion & event detection |
+| Moonshine (Useful Sensors) | ✅ Tested | English-only; on-device, very low footprint; models: `moonshine-tiny`, `moonshine-base` |
+| SenseVoice (Alibaba / FunAudio) | ✅ Tested | Multilingual (`zh`, `en`, `ja`, `ko`, `yue`), auto language detection, emotion & event detection |
 
 ## Evaluation Metrics
 
