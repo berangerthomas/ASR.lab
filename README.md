@@ -17,12 +17,12 @@ ASR.lab enables systematic evaluation of speech recognition engines under variou
 
 ## Features
 
-- **Multi-Engine Support**: Compare performance across different ASR frameworks (Whisper, Wav2Vec2, NeMo, Vosk, SeamlessM4T, etc.)
+- **Multi-Engine Support**: Compare performance across different ASR frameworks (Whisper, Wav2Vec2, NeMo, Vosk, SeamlessM4T, Moonshine, SenseVoice, etc.)
 - **Audio Degradation**: Apply controlled acoustic degradations (reverb, noise, compression) via VST3 plugins
-- **Audio Enhancement**: Test denoising/enhancement algorithms (Demucs; DeepFilterNet available via optional extras: `pip install .[deepfilter]`) on degraded audio
+- **Audio Enhancement**: Test denoising/enhancement algorithms (Demucs, DeepFilterNet) on degraded audio
 - **Loudness Normalization**: Grid search across different LUFS normalization levels (EBU R128 compliant)
 - **Evaluation Metrics**: WER, CER, MER, WIL, WIP for comprehensive transcription analysis
-- **Interactive Reports**: HTML reports with sortable tables, Plotly visualizations, and multi-filter dropdowns
+- **Interactive Reports**: HTML reports with JSON-driven client-side visualizations (no heavy Pandas/Plotly dependency), lazy JS character-diffs, sortable tables, and multi-filter dropdowns
 - **Multilingual**: Support for multiple languages and language-specific models
 - **Extensible**: Plugin architecture for adding new engines and metrics
 - **Grid Search**: Automatic Cartesian product of all test parameters (degradation × enhancement × normalization)
@@ -46,7 +46,8 @@ Each stage is optional and configurable. Multiple options at each stage create a
 | SeamlessM4T (Meta) | ✅ Tested | Detects v2 models, selects appropriate model class, and caps generation tokens (`max_new_tokens=256`) |
 | NeMo (NVIDIA) | ✅ Tested | Windows support via runtime SIGKILL compatibility patch; runtime setup handled automatically |
 | Vosk | ✅ Tested | Offline recognition; models auto-downloaded and extracted when needed |
-| HuBERT (Meta) | ⚠️ Experimental | Uses Wav2Vec2 tokenizer fallback |
+| Moonshine (Useful Sensors) | ✅ Available | English-only; on-device, very low footprint; models: `moonshine-tiny`, `moonshine-base` |
+| SenseVoice (Alibaba / FunAudio) | ✅ Available | Multilingual (`zh`, `en`, `ja`, `ko`, `yue`), auto language detection, emotion & event detection |
 
 ## Evaluation Metrics
 
@@ -178,11 +179,13 @@ This will:
 
 The generated `report_interactive.html` includes:
 
-- **Interactive Metric Normalization**: Toggle lowercase, punctuation removal, and contraction expansion - metrics update instantly without regenerating the report
-- **Multi-filter dropdowns**: Filter by engine, degradation, enhancement, and normalization
-- **Sortable tables**: Click column headers to sort
-- **Side-by-side diff**: Compare reference and hypothesis with error highlighting
-- **Multiple visualizations**: Scatter plots, heatmaps, box plots
+- **Multi-filter dropdowns**: Filter by language, engine, degradation, enhancement, audio normalization, and text normalization
+- **Performance Overview**: Scatter plot (time vs. metric) with subplots per language
+- **Metrics Visualization**: Heatmap of all metrics + configurable box plots (group/color by engine, language, degradation, etc.)
+- **Cross-Language Analysis**: Grouped bar chart (engine × language), engine × language heatmap, language consistency chart, and aggregated statistics table (mean ± std)
+- **Transcription Analysis**: Side-by-side reference vs. hypothesis with word-level and character-level diff highlighting
+- **Results Summary**: Sortable data table with CSV export
+- **Interactive Metric Normalization**: Toggle between raw and normalized text — metrics update via filter
 
 ### Output
 
@@ -194,12 +197,7 @@ Results are saved to `results/reports/<config>/`:
 
 ### Viewing Results
 
-Open `results/reports/<config>/report_interactive.html` in a web browser. The report includes:
-
-- Interactive Plotly charts with multi-filter dropdowns (engine, degradation, enhancement, normalization)
-- Sortable summary table (click column headers)
-- Side-by-side transcription comparison with diff highlighting
-- Performance metrics (WER, CER, processing time)
+Open `results/reports/<config>/report_interactive.html` in a web browser. Use the sticky filter bar to slice results by language, engine, degradation, enhancement, or normalization. All tabs update in sync.
 
 ## Data Organization
 
