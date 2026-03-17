@@ -1,10 +1,9 @@
+import json
 import jinja2
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 from pathlib import Path
 from typing import List, Dict, Any
 import datetime
-from jiwer.process import process_words, process_characters
+from jiwer.process import process_words
 
 
 class InteractiveReportGenerator:
@@ -45,25 +44,12 @@ class InteractiveReportGenerator:
             },
         }
 
-    @staticmethod
-    def _fmt_metric(val, precision=4):
-        """Format metric values, handling None and NaN."""
-        if val is None:
-            return "N/A"
-        try:
-            import pandas as pd
-            if pd.isna(val):
-                return "N/A"
-            return f"{float(val):.{precision}f}"
-        except (ValueError, TypeError):
-            return "N/A"
-
     def generate_report(self):
         """
         Renders a complete interactive HTML report with embedded Plotly charts.
         """
-        # Generate the Plotly chart
-        plotly_div = self._create_plotly_chart()
+        # Prepare chart data as JSON for client-side rendering
+        chart_data = self._prepare_chart_data()
         
         # Prepare data for the template
         prepared_results = self._prepare_results_for_template()
@@ -78,7 +64,7 @@ class InteractiveReportGenerator:
         template_data = {
             "generation_date": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "results": prepared_results,
-            "plotly_div": plotly_div,
+            "chart_data_json": json.dumps(chart_data, default=str),
             "engines": engines,
             "languages": languages,
             "degradations": degradations,
@@ -104,33 +90,26 @@ class InteractiveReportGenerator:
         file_size_mb = report_path.stat().st_size / (1024 * 1024)
         print(f"File size: {file_size_mb:.2f} MB")
 
-    def _create_plotly_chart(self) -> str:
-        """Creates an interactive Plotly chart and returns the HTML div."""
-        import pandas as pd
-        
-        # Prepare dataframe
+    def _prepare_chart_data(self) -> list:
+        """Prepares result data as a JSON-serializable list for client-side Plotly rendering."""
         records = []
         for idx, res in enumerate(self.results):
-            # Use fields from result if available, else fallback to parsing
             language = res.get("language") or res["dataset"].split('_')[0]
             degradation = res.get("degradation")
             enhancement = res.get("enhancement", "None")
-            
+
             if not degradation:
                 is_pristine = "original" in res["dataset"]
                 degradation = "original" if is_pristine else res["dataset"].split("degraded_")[-1]
 
-            # Get all metrics
             wer_value = res["metrics"].get("wer") or res["metrics"].get("WER")
             cer_value = res["metrics"].get("cer") or res["metrics"].get("CER")
             mer_value = res["metrics"].get("mer") or res["metrics"].get("MER")
             wil_value = res["metrics"].get("wil") or res["metrics"].get("WIL")
             wip_value = res["metrics"].get("wip") or res["metrics"].get("WIP")
-            
-            # Audio normalization (distinct from text normalization)
+
             audio_norm = res.get("audio_norm") or res.get("normalization")
             if not audio_norm or audio_norm == "None":
-                # Fallback: try to parse from dataset name
                 dataset_name = res["dataset"]
                 if dataset_name.endswith("norm_minus_18"):
                     audio_norm = "norm_minus_18"
@@ -138,13 +117,17 @@ class InteractiveReportGenerator:
                     audio_norm = "no_norm"
                 else:
                     audio_norm = "None"
-            
-            # Text normalization
+
             text_norm = res.get("text_norm", "raw")
+            time_s = res["transcription"]["processing_time"]
+
+            # Skip records with missing essential data
+            if wer_value is None or time_s is None:
+                continue
 
             records.append({
-                "result_idx": idx,  # Index for mapping
-                "language": language,
+                "idx": idx,
+                "lang": language,
                 "engine": res["engine"],
                 "dataset": res["dataset"],
                 "degradation": degradation,
@@ -156,211 +139,9 @@ class InteractiveReportGenerator:
                 "mer": mer_value,
                 "wil": wil_value,
                 "wip": wip_value,
-                "time_s": res["transcription"]["processing_time"],
+                "time_s": time_s,
             })
-        
-        df = pd.DataFrame(records)
-        df.dropna(subset=['wer', 'time_s'], inplace=True)
-        
-        if df.empty:
-            return "<p>No data available for plotting.</p>"
-
-        languages = df['language'].unique()
-        engines = df['engine'].unique()
-        degradations = df['degradation'].unique()
-        enhancements = df['enhancement'].unique()
-        audio_norms = df['audio_norm'].unique()
-        text_norms = df['text_norm'].unique()
-
-        # Create subplots
-        num_langs = len(languages)
-        rows = (num_langs + 1) // 2
-        cols = 2 if num_langs > 1 else 1
-
-        fig = make_subplots(
-            rows=rows, 
-            cols=cols,
-            subplot_titles=[f"Language: {lang.upper()}" for lang in languages],
-            vertical_spacing=0.12,
-            horizontal_spacing=0.1
-        )
-
-        # Color and symbol mapping
-        # Engines get different colors
-        color_map = {}
-        colors = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#feca57', '#ff6b6b']
-        for i, engine in enumerate(engines):
-            color_map[engine] = colors[i % len(colors)]
-        
-        # Degradations get different symbols
-        symbol_map = {'original': 'circle', 'None': 'circle'}
-        available_symbols = ['diamond', 'square', 'cross', 'x', 'triangle-up', 'star', 'hexagon']
-        symbol_idx = 0
-        for deg in degradations:
-            if deg not in symbol_map:
-                symbol_map[deg] = available_symbols[symbol_idx % len(available_symbols)]
-                symbol_idx += 1
-
-        # Add traces - now iterate over audio_norm and text_norm
-        for lang_idx, lang in enumerate(languages):
-            row = (lang_idx // cols) + 1
-            col = (lang_idx % cols) + 1
-            
-            lang_df = df[df['language'] == lang]
-            
-            for engine in engines:
-                for degradation in degradations:
-                    for enhancement in enhancements:
-                        for audio_norm in audio_norms:
-                            for text_norm in text_norms:
-                                mask = (lang_df['engine'] == engine) & \
-                                       (lang_df['degradation'] == degradation) & \
-                                       (lang_df['enhancement'] == enhancement) & \
-                                       (lang_df['audio_norm'] == audio_norm) & \
-                                       (lang_df['text_norm'] == text_norm)
-                                subset = lang_df[mask]
-                                
-                                if subset.empty:
-                                    continue
-                                
-                                # Differentiate enhancement in legend/hover
-                                enhancement_label = f" + {enhancement}" if enhancement != "None" else ""
-                                audio_norm_label = f" + {audio_norm}" if audio_norm != "None" else ""
-                                text_norm_label = f" [{text_norm}]"
-                                
-                                # Safe column access for optional metrics
-                                cer_vals = subset['cer'] if 'cer' in subset.columns else [None] * len(subset)
-                                mer_vals = subset['mer'] if 'mer' in subset.columns else [None] * len(subset)
-                                wil_vals = subset['wil'] if 'wil' in subset.columns else [None] * len(subset)
-                                wip_vals = subset['wip'] if 'wip' in subset.columns else [None] * len(subset)
-                                
-                                fmt = self._fmt_metric
-                                hover_text = [
-                                    f"<b>{engine}</b><br>" +
-                                    f"WER: {fmt(wer)}<br>" +
-                                    f"CER: {fmt(cer)}<br>" +
-                                    f"MER: {fmt(mer)}<br>" +
-                                    f"WIL: {fmt(wil)}<br>" +
-                                    f"WIP: {fmt(wip)}<br>" +
-                                    f"Time: {fmt(time_s, 2)}s<br>" +
-                                    f"Degradation: {degradation}<br>" +
-                                    f"Enhancement: {enhancement}<br>" +
-                                    f"Audio Norm: {audio_norm}<br>" +
-                                    f"Text Norm: {text_norm}<br>" +
-                                    f"Dataset: {dataset}"
-                                    for wer, cer, mer, wil, wip, time_s, dataset in zip(
-                                        subset['wer'], 
-                                        cer_vals,
-                                        mer_vals,
-                                        wil_vals,
-                                        wip_vals,
-                                        subset['time_s'],
-                                        subset['dataset']
-                                    )
-                                ]
-                                
-                                show_legend = (lang_idx == 0)
-                                legend_group = f"{engine}_{degradation}_{enhancement}_{audio_norm}_{text_norm}"
-                                
-                                # Prepare customdata for robust filtering in JS
-                                # Format: [engine, degradation, enhancement, audio_norm, text_norm, dataset, wer, cer, mer, wil, wip, result_idx]
-                                cer_col = subset['cer'] if 'cer' in subset.columns else [None] * len(subset)
-                                mer_col = subset['mer'] if 'mer' in subset.columns else [None] * len(subset)
-                                wil_col = subset['wil'] if 'wil' in subset.columns else [None] * len(subset)
-                                wip_col = subset['wip'] if 'wip' in subset.columns else [None] * len(subset)
-                                result_idx_col = subset['result_idx'] if 'result_idx' in subset.columns else [None] * len(subset)
-                                
-                                custom_data = [
-                                    [engine, degradation, enhancement, audio_norm, text_norm, dataset,
-                                     wer_val, cer_val, mer_val, wil_val, wip_val, result_idx]
-                                    for dataset, wer_val, cer_val, mer_val, wil_val, wip_val, result_idx in zip(
-                                        subset['dataset'],
-                                        subset['wer'],
-                                        cer_col,
-                                        mer_col,
-                                        wil_col,
-                                        wip_col,
-                                        result_idx_col
-                                    )
-                                ]
-                                
-                                # Visual distinction for text normalization:
-                                # - normalized: larger marker with thick border
-                                # - raw: smaller marker with thin border
-                                is_normalized = (text_norm == 'normalized')
-                                engine_color = color_map.get(engine, '#667eea')
-                                marker_size = 14 if is_normalized else 9
-                                marker_line_width = 3 if is_normalized else 1
-                                
-                                fig.add_trace(
-                                    go.Scatter(
-                                        x=subset['time_s'],
-                                        y=subset['wer'],
-                                        mode='markers',
-                                        name=f"{engine} ({degradation}{enhancement_label}{audio_norm_label}{text_norm_label})",
-                                        legendgroup=legend_group,
-                                        showlegend=show_legend,
-                                        marker=dict(
-                                            size=marker_size,
-                                            color=engine_color,
-                                            symbol=symbol_map.get(degradation, 'circle'),
-                                            line=dict(
-                                                width=marker_line_width,
-                                                color='white'
-                                            ),
-                                            opacity=1.0
-                                        ),
-                                        hovertext=hover_text,
-                                        hoverinfo='text',
-                                        customdata=custom_data,
-                                    ),
-                                    row=row,
-                                    col=col
-                                )
-
-        # Update axes
-        for i in range(1, rows + 1):
-            for j in range(1, cols + 1):
-                fig.update_xaxes(title_text="Processing Time (s)", row=i, col=j)
-                fig.update_yaxes(title_text="Word Error Rate (WER)", row=i, col=j)
-
-        # Update layout
-        fig.update_layout(
-            height=400 * rows,
-            hovermode='closest',
-            template='plotly_white',
-            showlegend=True,
-            legend=dict(
-                orientation="v",
-                yanchor="top",
-                y=1,
-                xanchor="left",
-                x=1.02,
-                font=dict(size=10)
-            ),
-            margin=dict(t=100, b=50, l=50, r=150),
-        )
-
-        # Convert to HTML div (fully autonomous with embedded Plotly.js)
-        plotly_html = fig.to_html(
-            include_plotlyjs=True,
-            full_html=False,
-            div_id='plotly-chart',
-            config={
-                'displayModeBar': True,
-                'displaylogo': False,
-                'modeBarButtonsToRemove': ['lasso2d', 'select2d'],
-                'toImageButtonOptions': {
-                    'format': 'png',
-                    'filename': 'asr_benchmark',
-                    'height': 1000,
-                    'width': 1400,
-                    'scale': 2
-                }
-            }
-        )
-        
-        return plotly_html
+        return records
 
     def _prepare_results_for_template(self) -> List[Dict[str, Any]]:
         """Prepares the results data for easy rendering in the template."""
@@ -404,9 +185,6 @@ class InteractiveReportGenerator:
             # Generate word-level alignment (for WER, MER, WIL, WIP)
             word_ref_html, word_trans_html = self._generate_word_alignment(ref_text, trans_text)
             
-            # Generate character-level alignment (for CER)
-            char_ref_html, char_trans_html = self._generate_char_alignment(ref_text, trans_text)
-
             prepared.append({
                 "dataset": res["dataset"],
                 "engine": res["engine"],
@@ -422,13 +200,9 @@ class InteractiveReportGenerator:
                 "wil": wil_value,
                 "wip": wip_value,
                 "time_s": res["transcription"]["processing_time"],
-                "transcription": res["transcription"],
                 # Word-level diff (for WER/MER/WIL/WIP)
                 "reference_text_words": word_ref_html,
                 "transcribed_text_words": word_trans_html,
-                # Character-level diff (for CER)
-                "reference_text_chars": char_ref_html,
-                "transcribed_text_chars": char_trans_html,
             })
         return prepared
 
@@ -457,27 +231,4 @@ class InteractiveReportGenerator:
         except Exception:
             return ref_text, trans_text
 
-    def _generate_char_alignment(self, ref_text: str, trans_text: str) -> tuple[str, str]:
-        """Generate HTML with character-level alignment highlighting."""
-        try:
-            output = process_characters(ref_text, trans_text)
-            ref_html, trans_html = [], []
 
-            for chunk in output.alignments[0]:
-                ref_chars = output.references[0][chunk.ref_start_idx:chunk.ref_end_idx]
-                hyp_chars = output.hypotheses[0][chunk.hyp_start_idx:chunk.hyp_end_idx]
-
-                if chunk.type == 'equal':
-                    ref_html.append(''.join(ref_chars))
-                    trans_html.append(''.join(hyp_chars))
-                elif chunk.type == 'substitute':
-                    ref_html.append(f'<span class="diff-del">{"".join(ref_chars)}</span>')
-                    trans_html.append(f'<span class="diff-add">{"".join(hyp_chars)}</span>')
-                elif chunk.type == 'delete':
-                    ref_html.append(f'<span class="diff-del">{"".join(ref_chars)}</span>')
-                elif chunk.type == 'insert':
-                    trans_html.append(f'<span class="diff-add">{"".join(hyp_chars)}</span>')
-
-            return "".join(ref_html), "".join(trans_html)
-        except Exception:
-            return ref_text, trans_text

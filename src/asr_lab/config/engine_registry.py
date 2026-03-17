@@ -5,6 +5,8 @@ from ..engines.vosk import VoskEngine
 from ..engines.hubert import HubertEngine
 from ..engines.kaldi import KaldiEngine
 from ..engines.seamless import SeamlessM4TEngine
+from ..engines.moonshine import MoonshineEngine
+from ..engines.sensevoice import SenseVoiceEngine
 
 ENGINE_REGISTRY = {
     "whisper": WhisperEngine,
@@ -14,4 +16,6 @@ ENGINE_REGISTRY = {
     "hubert": HubertEngine,
     "kaldi": KaldiEngine,
     "seamless": SeamlessM4TEngine,
+    "moonshine": MoonshineEngine,
+    "sensevoice": SenseVoiceEngine,
 }

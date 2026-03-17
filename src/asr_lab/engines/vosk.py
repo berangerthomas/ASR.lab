@@ -27,7 +27,7 @@ class VoskEngine(ASREngine):
             try:
                 from vosk import Model, KaldiRecognizer
             except ImportError:
-                raise ImportError("Vosk not installed. Install with: pip install vosk")
+                raise ImportError("Vosk not installed. Install with: uv add vosk")
             
             self.model = Model(self.model_path)
             self.recognizer = KaldiRecognizer

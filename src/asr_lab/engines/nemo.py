@@ -30,7 +30,7 @@ class NeMoEngine(ASREngine):
                 import nemo.collections.asr as nemo_asr
             except ImportError:
                 raise ImportError(
-                    "NeMo toolkit not installed. Install with: pip install nemo_toolkit[asr]"
+                    "NeMo toolkit not installed. Install with: uv add nemo_toolkit[asr]"
                 )
             
             # Load pre-trained model from NVIDIA NGC

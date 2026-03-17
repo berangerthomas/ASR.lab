@@ -25,9 +25,15 @@ class CsvExporter:
         """Converts the results list into a structured pandas DataFrame for export."""
         records = []
         for res in self.results:
-            language = res["dataset"].split('_')[0]
-            is_pristine = "original" in res["dataset"]
-            degradation = "original" if is_pristine else res["dataset"].split("degraded_")[-1]
+            language = res.get("language") or res["dataset"].split('_')[0]
+            degradation = res.get("degradation")
+            if not degradation:
+                is_pristine = "original" in res["dataset"]
+                degradation = "original" if is_pristine else res["dataset"].split("degraded_")[-1]
+
+            enhancement = res.get("enhancement", "None")
+            audio_norm = res.get("audio_norm", "None")
+            text_norm = res.get("text_norm", "raw")
 
             # Get metric values (try both lowercase and uppercase for backward compatibility)
             wer_value = res["metrics"].get("wer") or res["metrics"].get("WER")
@@ -39,6 +45,9 @@ class CsvExporter:
                 "engine": res["engine"],
                 "dataset": res["dataset"],
                 "degradation": degradation,
+                "enhancement": enhancement,
+                "audio_norm": audio_norm,
+                "text_norm": text_norm,
                 "wer": wer_value,
                 "rtf": rtf_value,
                 "cer": cer_value,

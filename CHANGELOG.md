@@ -1,5 +1,46 @@
 # Changelog
 
+## [2.0.0] - 2026-03-17
+
+### Added
+
+- **Moonshine engine** (`src/asr_lab/engines/moonshine.py`): new `MoonshineEngine` supporting `UsefulSensors/moonshine-base` and `UsefulSensors/moonshine-tiny`. Uses the Hugging Face Transformers pipeline. English-only; no additional dependencies required.
+- **SenseVoice engine** (`src/asr_lab/engines/sensevoice.py`): new `SenseVoiceEngine` supporting `FunAudioLLM/SenseVoiceSmall` via the FunASR library. Multilingual with automatic language detection (`auto`, `zh`, `en`, `ja`, `ko`, `yue`). Applies Inverse Text Normalization by default.
+- **Cross-language analysis**: new "Cross-Language Analysis" tab in the interactive report with grouped bar chart (engine × language), engine × language heatmap, language consistency chart, and aggregated statistics table.
+- Language filter in the global filter bar.
+- Language column in the results summary table and language badge in transcription cards.
+- Language as a "Group By" / "Color By" option in box plots.
+- Language included in heatmap row labels.
+- `aggregator.py`: statistics module (`aggregate_by`, `cross_language_matrix`, `language_consistency`) for multi-file and cross-language aggregation.
+- HTML report, tab "Detailled transcription analysis" : sort buttons and time metric.
+
+### Changed
+
+- **Client-Side Rendering**: Replaced server-side Plotly/Pandas plotting with JSON chart data (`chart_data_json`) for responsive client-side UI rendering.
+- **Reporting System**: `InteractiveReportGenerator` now prepares a JSON-serializable records list instead of generating an HTML Plotly div.
+- **Engine Metrics**: Updated `engine_registry`, `nemo`, `vosk`, `aggregator`, and `export` to expose explicit metadata/metrics required by the new client-side visualizations.
+- CSV export now includes `enhancement`, `audio_norm`, and `text_norm` columns and reads `language` directly from results instead of parsing it from the dataset name.
+- Scatter chart customdata includes language for filter support.
+- **`audio_source_dir` now accepts a directory, a single file, or a glob pattern**:  
+  - Directory (e.g. `"data/audio"`): loads all `*.json` manifest files in the directory.  
+  - Single file (e.g. `"data/audio/manifest_en.json"`): loads that manifest only.  
+  - Glob pattern (e.g. `"data/audio/manifest_fr*.json"`): loads all matching `.json` files.  
+  Previously, only a directory was supported and a single hardcoded `manifest.json` was expected.
+- Relative audio paths in manifests are now resolved from the **manifest's parent directory** (instead of from `audio_source_dir`).
+
+### Fixed
+
+- Fix box plot controls: "Normalization" option was not wired to any data attribute — replaced by distinct "Audio Norm" and "Text Norm" options matching the existing JS switch cases.
+- Convert Demucs-separated vocals to mono before writing (average channels) and simplify saving logic to write a 1-D waveform. This ensures ASR pipelines receive mono audio and avoids incorrect transposes.
+- Also import os and close the file descriptor returned by tempfile.mkstemp immediately to avoid descriptor leaks and allow the downloader to open the temp file by path.
+
+### Removed
+
+- **Server-side diffs**: Removed server-side character-level alignment and heavy Pandas usage in favor of a lazy JavaScript char-diff implementation.
+- Delete unused `visualizer.py` (Matplotlib/Seaborn) and `visualizer_plotly.py` — all visualizations are now handled by the interactive report template via client-side JS.
+
+---
+
 ## [1.1.0] - 2026-03-07
 
 ### Added

@@ -263,6 +263,19 @@
         <!-- Global Filters Bar -->
         <div class="filters-bar">
             <div class="custom-select">
+                <label>Languages</label>
+                <button class="select-button" id="language-select-button">All Languages</button>
+                <div class="checkbox-list" id="language-filters">
+                    <div class="select-all-buttons">
+                        <button data-action="select-all">Select All</button>
+                        <button data-action="deselect-all">Deselect All</button>
+                    </div>
+                    {% for language in languages %}
+                    <label><input type="checkbox" value="{{ language }}" checked> {{ language|upper }}</label>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="custom-select">
                 <label>Engines</label>
                 <button class="select-button" id="engine-select-button">All Engines</button>
                 <div class="checkbox-list" id="engine-filters">
@@ -335,6 +348,7 @@
             <nav class="tabs-nav">
                 <button class="tab-btn active" data-tab="performance">Performance Overview</button>
                 <button class="tab-btn" data-tab="charts">Metrics Visualization</button>
+                <button class="tab-btn" data-tab="crosslang" id="crosslang-tab-btn">Comparative Analysis</button>
                 <button class="tab-btn" data-tab="analysis">Detailed Transcription Analysis</button>
                 <button class="tab-btn" data-tab="data">Results Summary</button>
                 <button class="tab-btn" data-tab="help">Help</button>
@@ -355,9 +369,8 @@
                     </div>
                 </div>
                 
-                <div class="plotly-container" id="main-chart">
-                    {{ plotly_div|safe }}
-                </div>
+                <div class="plotly-container" id="main-chart"></div>
+                <script>var __chartData = {{ chart_data_json|safe }};</script>
             </div>
 
             <!-- Tab 2: Charts (Heatmap + Box Plots) -->
@@ -380,6 +393,7 @@
                         <label>Group By:</label>
                         <select id="boxplot-groupby">
                             <option value="engine">Engine</option>
+                            <option value="language">Language</option>
                             <option value="degradation">Degradation</option>
                             <option value="enhancement">Enhancement</option>
                             <option value="audio_norm">Audio Norm</option>
@@ -399,6 +413,7 @@
                         <select id="boxplot-colorby">
                             <option value="none">None (Single Color)</option>
                             <option value="engine">Engine</option>
+                            <option value="language">Language</option>
                             <option value="degradation">Degradation</option>
                             <option value="enhancement">Enhancement</option>
                             <option value="audio_norm">Audio Norm</option>
@@ -408,6 +423,75 @@
                 </div>
                 
                 <div class="plotly-container" id="boxplot-chart"></div>
+            </div>
+
+            <!-- Tab: Comparative Analysis -->
+            <div class="tab-content" id="tab-crosslang">
+                <h2 id="crosslang-title">Comparative Analysis</h2>
+                <p id="crosslang-subtitle" style="color: var(--secondary-color); font-size: 0.85rem; margin-bottom: 1.5rem;">
+                    Compare ASR engine performance across languages and conditions.
+                </p>
+
+                <!-- Metric selector for cross-language charts -->
+                <div class="control-bar">
+                    <label>Metric:</label>
+                    <div class="metric-radio-group" id="crosslang-metric-radios">
+                        {% for key, info in metrics_info.items() %}
+                        <label title="{{ info.description }}">
+                            <input type="radio" name="crosslang-metric" value="{{ key }}" {% if key == 'wer' %}checked{% endif %}>
+                            <span>{{ key|upper }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Grouped Bar Chart: metric by engine, grouped by language -->
+                <h3 id="crosslang-bar-title">Engine Performance by Language</h3>
+                <p id="crosslang-bar-desc" style="color: var(--secondary-color); font-size: 0.85rem; margin-bottom: 1rem;">
+                    Grouped bar chart comparing each engine's mean metric value across languages.
+                </p>
+                <div class="plotly-container" id="crosslang-bar-chart"></div>
+
+                <!-- Engine × Language Heatmap -->
+                <h3 style="margin-top: 2rem;">Engine × Language Heatmap</h3>
+                <p style="color: var(--secondary-color); font-size: 0.85rem; margin-bottom: 1rem;">
+                    Matrix view of mean metric values. Rows = engines, columns = languages. Green = better, red = worse.
+                </p>
+                <div class="plotly-container" id="crosslang-heatmap"></div>
+
+                <!-- Language Consistency (hidden when single language) -->
+                <div id="crosslang-consistency-section">
+                    <h3 style="margin-top: 2rem;">Language Consistency</h3>
+                    <p style="color: var(--secondary-color); font-size: 0.85rem; margin-bottom: 1rem;">
+                        Cross-language standard deviation per engine. Lower = more consistent across languages.
+                    </p>
+                    <div class="plotly-container-small" id="crosslang-consistency"></div>
+                </div>
+
+                <!-- Aggregated Statistics Table -->
+                <h3 style="margin-top: 2rem;">Aggregated Statistics</h3>
+                <p style="color: var(--secondary-color); font-size: 0.85rem; margin-bottom: 1rem;">
+                    Mean, median, and standard deviation of metrics grouped by engine and language.
+                </p>
+                <div class="table-wrapper" id="aggregated-stats-wrapper">
+                    <table id="aggregated-stats-table">
+                        <thead>
+                            <tr>
+                                <th>Engine</th>
+                                <th>Language</th>
+                                <th>Samples</th>
+                                <th>WER (mean ± std)</th>
+                                <th>CER (mean ± std)</th>
+                                <th>MER (mean ± std)</th>
+                                <th>WIL (mean ± std)</th>
+                                <th>WIP (mean ± std)</th>
+                                <th>Time (mean)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="aggregated-stats-body">
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <!-- Tab 3: Detailed Analysis (Transcriptions) -->
@@ -462,6 +546,7 @@
                 {% for result in results %}
                 <div class="transcription-card" 
                      data-engine="{{ result.engine }}" 
+                     data-language="{{ result.language }}"
                      data-degradation="{{ result.degradation }}"
                      data-enhancement="{{ result.enhancement or 'None' }}"
                      data-audio-norm="{{ result.audio_norm or 'None' }}"
@@ -476,6 +561,7 @@
                     <div class="transcription-header">
                         <div>
                             <strong>{{ result.engine }}</strong> • 
+                            <span style="text-transform:uppercase; font-weight:600; color:var(--accent-color);">{{ result.language }}</span> • 
                             {{ result.degradation|capitalize }}
                             {% if result.enhancement and result.enhancement != 'None' %} + {{ result.enhancement|capitalize }}{% endif %}
                             {% if result.audio_norm and result.audio_norm != 'None' %} + {{ result.audio_norm|capitalize }}{% endif %}
@@ -512,7 +598,6 @@
                             <div class="col-header">Hypothesis (Diff)</div>
                             <div class="text-content">
                                 <div class="diff-words">{{ result.transcribed_text_words|safe }}</div>
-                                <div class="diff-chars" style="display: none;">{{ result.transcribed_text_chars|safe }}</div>
                             </div>
                         </div>
                     </div>
@@ -532,19 +617,21 @@
                         <thead>
                             <tr>
                                 <th onclick="sortTable(0, false)">Engine</th>
-                                <th onclick="sortTable(1, false)">Degradation</th>
-                                <th onclick="sortTable(2, false)">Enhancement</th>
-                                <th onclick="sortTable(3, false)">Audio Norm</th>
-                                <th onclick="sortTable(4, false)">Text Norm</th>
+                                <th onclick="sortTable(1, false)">Language</th>
+                                <th onclick="sortTable(2, false)">Degradation</th>
+                                <th onclick="sortTable(3, false)">Enhancement</th>
+                                <th onclick="sortTable(4, false)">Audio Norm</th>
+                                <th onclick="sortTable(5, false)">Text Norm</th>
                                 {% for key, info in metrics_info.items() %}
-                                <th onclick="sortTable({{ loop.index + 4 }}, true)">{{ key|upper }}</th>
+                                <th onclick="sortTable({{ loop.index + 5 }}, true)">{{ key|upper }}</th>
                                 {% endfor %}
-                                <th onclick="sortTable({{ metrics_info|length + 5 }}, true)">Time (s)</th>
+                                <th onclick="sortTable({{ metrics_info|length + 6 }}, true)">Time (s)</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for result in results %}
                             <tr data-engine="{{ result.engine }}" 
+                                data-language="{{ result.language }}"
                                 data-degradation="{{ result.degradation }}"
                                 data-enhancement="{{ result.enhancement or 'None' }}"
                                 data-audio-norm="{{ result.audio_norm or 'None' }}"
@@ -554,6 +641,7 @@
                                 data-{{ key }}="{{ result.get(key, '') if result.get(key) is not none else '' }}"
                                 {% endfor %}>
                                 <td>{{ result.engine }}</td>
+                                <td style="text-transform:uppercase; font-weight:600;">{{ result.language }}</td>
                                 <td>{{ result.degradation|capitalize }}</td>
                                 <td>{{ result.enhancement|capitalize if result.enhancement and result.enhancement != 'None' else '-' }}</td>
                                 <td>{{ result.audio_norm|capitalize if result.audio_norm and result.audio_norm != 'None' else '-' }}</td>
@@ -736,6 +824,7 @@
             });
         }
         
+        setupDropdown('language-select-button', 'language-filters');
         setupDropdown('engine-select-button', 'engine-filters');
         setupDropdown('degradation-select-button', 'degradation-filters');
         setupDropdown('enhancement-select-button', 'enhancement-filters');
@@ -782,8 +871,8 @@
                 
                 // Update views after tab becomes visible (use setTimeout to ensure DOM is updated)
                 setTimeout(() => {
-                    if (tabId === 'overview') {
-                        updateMainChart();
+                    if (tabId === 'performance') {
+                        createMainScatterChart();
                     } else if (tabId === 'summary') {
                         updateTableRows();
                     } else if (tabId === 'transcriptions') {
@@ -791,6 +880,8 @@
                     } else if (tabId === 'charts') {
                         createMetricsHeatmap();
                         createBoxPlot();
+                    } else if (tabId === 'crosslang') {
+                        createCrossLangCharts();
                     }
                 }, 10);
             });
@@ -805,12 +896,13 @@
             return Array.from(document.querySelectorAll(`#${filterId} input[type="checkbox"]`)).map(cb => cb.value);
         }
         
-        function isVisible(engine, degradation, enhancement, audioNorm, textNorm) {
+        function isVisible(engine, degradation, enhancement, audioNorm, textNorm, language) {
             const selectedEngines = getSelectedValues('engine-filters');
             const selectedDegradations = getSelectedValues('degradation-filters');
             const selectedEnhancements = getSelectedValues('enhancement-filters');
             const selectedAudioNorms = getSelectedValues('audio-norm-filters');
             const selectedTextNorms = getSelectedValues('text-norm-filters');
+            const selectedLanguages = getSelectedValues('language-filters');
             
             const enhancementOptions = getAllOptions('enhancement-filters');
             const audioNormOptions = getAllOptions('audio-norm-filters');
@@ -822,58 +914,23 @@
             const isAudioNormVisible = selectedAudioNorms.includes(audioNorm) || 
                                        (audioNorm === "None" && !audioNormOptions.includes("None"));
             const isTextNormVisible = selectedTextNorms.includes(textNorm);
+            const isLanguageVisible = !language || selectedLanguages.includes(language);
             
-            return isEngineVisible && isDegradationVisible && isEnhancementVisible && isAudioNormVisible && isTextNormVisible;
+            return isEngineVisible && isDegradationVisible && isEnhancementVisible && isAudioNormVisible && isTextNormVisible && isLanguageVisible;
         }
 
         // ============ UPDATE ALL VIEWS ============
         function updateAllViews() {
-            updateMainChart();
+            createMainScatterChart();
             updateTableRows();
             updateTranscriptionCards();
             createMetricsHeatmap();
             createBoxPlot();
+            createCrossLangCharts();
         }
 
-        // ============ MAIN CHART UPDATE ============
-        const mainChartDiv = document.querySelector('.plotly-container .js-plotly-plot') || document.querySelector('.js-plotly-plot');
-        
-        // Store trace structure for metric updates
-        // customdata format: [engine, degradation, enhancement, normalization, dataset, wer, cer, mer, wil, wip, result_idx]
-        let traceResultIndices = null;
-        
-        if (mainChartDiv && mainChartDiv.data) {
-            // customdata format: [engine, degradation, enhancement, audio_norm, text_norm, dataset, wer, cer, mer, wil, wip, result_idx]
-            traceResultIndices = mainChartDiv.data.map((trace) => {
-                if (trace.customdata && trace.customdata.length > 0) {
-                    return trace.customdata.map(d => d[11]);  // result_idx at index 11
-                }
-                return null;
-            });
-        }
-        
-        function updateMainChart() {
-            if (!mainChartDiv || !mainChartDiv.data) return;
-            
-            const selectedMetric = document.querySelector('#metric-radios input[type="radio"]:checked')?.value || 'wer';
-            
-            const updates = mainChartDiv.data.map((trace, traceIdx) => {
-                let visible = false;
-                if (trace.customdata && trace.customdata.length > 0) {
-                    const data = trace.customdata[0];
-                    // customdata: [engine, degradation, enhancement, audio_norm, text_norm, ...]
-                    visible = isVisible(data[0], data[1], data[2], data[3], data[4]);
-                }
-                
-                return { visible };
-            });
-            
-            // Update visibility
-            Plotly.restyle(mainChartDiv, { visible: updates.map(u => u.visible) });
-        }
-
-        // ============ METRIC SWITCHER ============
-        const metricRadios = document.querySelectorAll('#metric-radios input[type="radio"]');
+        // ============ CHART DATA & CONSTANTS ============
+        const chartData = (typeof __chartData !== 'undefined') ? __chartData : [];
         const metricNames = {
             'wer': 'Word Error Rate (WER)',
             'cer': 'Character Error Rate (CER)',
@@ -881,39 +938,192 @@
             'wil': 'Word Information Lost (WIL)',
             'wip': 'Word Information Preserved (WIP)'
         };
-        
-        function updateChartMetric() {
+        const engineColors = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#feca57', '#ff6b6b'];
+        const degradationSymbols = ['diamond', 'square', 'cross', 'x', 'triangle-up', 'star', 'hexagon'];
+        const plotlyConfig = {
+            displayModeBar: true,
+            displaylogo: false,
+            modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+            toImageButtonOptions: { format: 'png', filename: 'asr_benchmark', height: 1000, width: 1400, scale: 2 }
+        };
+
+        // ============ DYNAMIC SCATTER CHART ============
+        function createMainScatterChart() {
+            const chartDiv = document.getElementById('main-chart');
+            if (!chartDiv || chartData.length === 0) return;
+
             const selectedMetric = document.querySelector('#metric-radios input[type="radio"]:checked')?.value || 'wer';
             const metricName = metricNames[selectedMetric];
-            
-            if (mainChartDiv && mainChartDiv.data) {
-                // Filter and update selected metric values
-                const metricIndex = {'wer': 6, 'cer': 7, 'mer': 8, 'wil': 9, 'wip': 10};
-                const mIdx = metricIndex[selectedMetric];
-                
-                const newYValues = mainChartDiv.data.map((trace) => {
-                    if (trace.customdata && trace.customdata.length > 0) {
-                        return trace.customdata.map(d => d[mIdx]);
-                    }
-                    return null;
-                });
-                
-                Plotly.restyle(mainChartDiv, { y: newYValues });
-                
-                // Also update visibility
-                updateMainChart();
-                
-                // Update axis labels
-                const layoutUpdate = {};
-                const numAxes = Object.keys(mainChartDiv.layout).filter(k => k.startsWith('yaxis')).length;
-                layoutUpdate['yaxis.title.text'] = metricName;
-                for (let i = 2; i <= numAxes + 1; i++) {
-                    layoutUpdate[`yaxis${i}.title.text`] = metricName;
-                }
-                Plotly.relayout(mainChartDiv, layoutUpdate);
+
+            // Filter data by current filters
+            const visible = chartData.filter(d =>
+                isVisible(d.engine, d.degradation, d.enhancement, d.audio_norm, d.text_norm, d.lang)
+            );
+
+            if (visible.length === 0) {
+                Plotly.purge(chartDiv);
+                chartDiv.innerHTML = '<p style="text-align:center; padding: 2rem; color: #888;">No data matches the current filters</p>';
+                return;
             }
-            
+
+            // Determine visible languages (preserving order)
+            const langSet = new Set();
+            visible.forEach(d => langSet.add(d.lang));
+            const languages = [...langSet].sort();
+
+            // Dynamic subplot grid: 1 lang = 1 col full width, 2+ = 2 cols
+            const numLangs = languages.length;
+            const cols = numLangs > 1 ? 2 : 1;
+            const rows = Math.ceil(numLangs / cols);
+
+            // Build subplot titles
+            const subplotTitles = languages.map(l => 'Language: ' + l.toUpperCase());
+
+            // Color map for engines
+            const allEngines = [...new Set(visible.map(d => d.engine))].sort();
+            const colorMap = {};
+            allEngines.forEach((eng, i) => { colorMap[eng] = engineColors[i % engineColors.length]; });
+
+            // Symbol map for degradations
+            const allDegs = [...new Set(visible.map(d => d.degradation))];
+            const symbolMap = { 'original': 'circle', 'None': 'circle' };
+            let symIdx = 0;
+            allDegs.forEach(deg => {
+                if (!(deg in symbolMap)) {
+                    symbolMap[deg] = degradationSymbols[symIdx % degradationSymbols.length];
+                    symIdx++;
+                }
+            });
+
+            // Group data by (lang, engine, degradation, enhancement, audio_norm, text_norm)
+            const groups = {};
+            visible.forEach(d => {
+                const key = [d.lang, d.engine, d.degradation, d.enhancement, d.audio_norm, d.text_norm].join('|||');
+                if (!groups[key]) groups[key] = [];
+                groups[key].push(d);
+            });
+
+            // Track legendgroups already shown
+            const legendShown = new Set();
+            const traces = [];
+
+            languages.forEach((lang, langIdx) => {
+                const row = Math.floor(langIdx / cols) + 1;
+                const col = (langIdx % cols) + 1;
+                // Plotly subplot axis naming: first subplot has no suffix, others have 2, 3, ...
+                const axisIdx = langIdx === 0 ? '' : String(langIdx + 1);
+
+                Object.entries(groups).forEach(([key, points]) => {
+                    if (points[0].lang !== lang) return;
+
+                    const d0 = points[0];
+                    const enhLabel = d0.enhancement !== 'None' ? ' + ' + d0.enhancement : '';
+                    const normLabel = d0.audio_norm !== 'None' ? ' + ' + d0.audio_norm : '';
+                    const textLabel = ' [' + d0.text_norm + ']';
+                    const legendGroup = d0.engine + '_' + d0.degradation + '_' + d0.enhancement + '_' + d0.audio_norm + '_' + d0.text_norm;
+                    const showLegend = !legendShown.has(legendGroup);
+                    if (showLegend) legendShown.add(legendGroup);
+
+                    const isNorm = d0.text_norm === 'normalized';
+
+                    const fmt = v => (v !== null && v !== undefined) ? v.toFixed(4) : 'N/A';
+                    const hovertext = points.map(p =>
+                        '<b>' + p.engine + '</b><br>' +
+                        'WER: ' + fmt(p.wer) + '<br>' +
+                        'CER: ' + fmt(p.cer) + '<br>' +
+                        'MER: ' + fmt(p.mer) + '<br>' +
+                        'WIL: ' + fmt(p.wil) + '<br>' +
+                        'WIP: ' + fmt(p.wip) + '<br>' +
+                        'Time: ' + (p.time_s !== null ? p.time_s.toFixed(2) + 's' : 'N/A') + '<br>' +
+                        'Degradation: ' + p.degradation + '<br>' +
+                        'Enhancement: ' + p.enhancement + '<br>' +
+                        'Audio Norm: ' + p.audio_norm + '<br>' +
+                        'Text Norm: ' + p.text_norm + '<br>' +
+                        'Dataset: ' + p.dataset
+                    );
+
+                    traces.push({
+                        x: points.map(p => p.time_s),
+                        y: points.map(p => p[selectedMetric]),
+                        xaxis: 'x' + axisIdx,
+                        yaxis: 'y' + axisIdx,
+                        mode: 'markers',
+                        type: 'scatter',
+                        name: d0.engine + ' (' + d0.degradation + enhLabel + normLabel + textLabel + ')',
+                        legendgroup: legendGroup,
+                        showlegend: showLegend,
+                        marker: {
+                            size: isNorm ? 14 : 9,
+                            color: colorMap[d0.engine] || '#667eea',
+                            symbol: symbolMap[d0.degradation] || 'circle',
+                            line: { width: isNorm ? 3 : 1, color: 'white' },
+                            opacity: 1.0
+                        },
+                        hovertext: hovertext,
+                        hoverinfo: 'text'
+                    });
+                });
+            });
+
+            // Build layout with dynamic subplots
+            const layout = {
+                height: rows > 1 ? 450 * rows : 400,
+                hovermode: 'closest',
+                showlegend: true,
+                legend: { orientation: 'v', yanchor: 'top', y: 1, xanchor: 'left', x: 1.02, font: { size: 10 } },
+                margin: { t: 80, b: 50, l: 60, r: 150 },
+                annotations: []
+            };
+
+            // Compute subplot domains
+            const hGap = 0.08;
+            const vGap = rows > 1 ? 0.22 : 0.1;
+            const plotWidth = cols === 1 ? 0.85 : (0.85 - hGap * (cols - 1)) / cols;
+            const plotHeight = (1 - vGap * (rows - 1)) / rows;
+
+            languages.forEach((lang, i) => {
+                const r = Math.floor(i / cols);
+                const c = i % cols;
+                const axisIdx = i === 0 ? '' : String(i + 1);
+
+                const x0 = c * (plotWidth + hGap);
+                const x1 = x0 + plotWidth;
+                const y1 = 1 - r * (plotHeight + vGap);
+                const y0 = y1 - plotHeight;
+
+                layout['xaxis' + axisIdx] = {
+                    domain: [x0, x1],
+                    anchor: 'y' + axisIdx,
+                    title: { text: 'Processing Time (s)' }
+                };
+                layout['yaxis' + axisIdx] = {
+                    domain: [Math.max(0, y0), y1],
+                    anchor: 'x' + axisIdx,
+                    title: { text: metricName }
+                };
+
+                // Subplot title as annotation
+                layout.annotations.push({
+                    text: '<b>Language: ' + lang.toUpperCase() + '</b>',
+                    xref: 'paper', yref: 'paper',
+                    x: (x0 + x1) / 2, y: y1 + 0.04,
+                    showarrow: false,
+                    font: { size: 13 }
+                });
+            });
+
+            Plotly.newPlot(chartDiv, traces, layout, plotlyConfig);
+        }
+
+        // ============ METRIC SWITCHER ============
+        const metricRadios = document.querySelectorAll('#metric-radios input[type="radio"]');
+
+        function updateChartMetric() {
+            // Rebuild the scatter chart with the new metric
+            createMainScatterChart();
+
             // Auto-select diff view based on metric
+            const selectedMetric = document.querySelector('#metric-radios input[type="radio"]:checked')?.value || 'wer';
             const diffViewRadios = document.querySelectorAll('#diff-view-radios input[type="radio"]');
             if (selectedMetric === 'cer') {
                 diffViewRadios.forEach(r => r.checked = (r.value === 'chars'));
@@ -922,7 +1132,7 @@
             }
             updateDiffView();
         }
-        
+
         metricRadios.forEach(radio => radio.addEventListener('change', updateChartMetric));
 
         // ============ TABLE ROWS UPDATE ============
@@ -933,7 +1143,8 @@
                     row.dataset.degradation,
                     row.dataset.enhancement || "None",
                     row.dataset.audioNorm || "None",
-                    row.dataset.textNorm || "raw"
+                    row.dataset.textNorm || "raw",
+                    row.dataset.language || ""
                 );
                 row.style.display = visible ? '' : 'none';
             });
@@ -947,10 +1158,60 @@
                     card.dataset.degradation,
                     card.dataset.enhancement || "None",
                     card.dataset.audioNorm || "None",
-                    card.dataset.textNorm || "raw"
+                    card.dataset.textNorm || "raw",
+                    card.dataset.language || ""
                 );
                 card.style.display = visible ? '' : 'none';
             });
+        }
+
+        // ============ CHAR-LEVEL DIFF (lazy, computed on demand) ============
+        function escHtml(s) {
+            return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
+        function computeCharDiffHtml(ref, hyp) {
+            if (ref === hyp) return escHtml(hyp);
+            if (!ref) return '<span class="diff-add">' + escHtml(hyp) + '</span>';
+            if (!hyp) return '';
+            const n = ref.length, m = hyp.length;
+            // Guard against very long texts (> ~1500 chars each)
+            if (n * m > 2250000) return escHtml(hyp);
+
+            const dp = Array(n + 1);
+            for (let i = 0; i <= n; i++) { dp[i] = new Array(m + 1); dp[i][0] = i; }
+            for (let j = 0; j <= m; j++) dp[0][j] = j;
+            for (let i = 1; i <= n; i++)
+                for (let j = 1; j <= m; j++)
+                    dp[i][j] = ref[i-1] === hyp[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j-1], dp[i-1][j], dp[i][j-1]);
+
+            let i = n, j = m;
+            const ops = [];
+            while (i > 0 || j > 0) {
+                if (i > 0 && j > 0 && ref[i-1] === hyp[j-1]) {
+                    ops.push({t:'E', c:hyp[j-1]}); i--; j--;
+                } else if (i > 0 && j > 0 && dp[i][j] === dp[i-1][j-1] + 1) {
+                    ops.push({t:'S', c:hyp[j-1]}); i--; j--;
+                } else if (j > 0 && dp[i][j] === dp[i][j-1] + 1) {
+                    ops.push({t:'I', c:hyp[j-1]}); j--;
+                } else {
+                    ops.push({t:'D', c:''}); i--;
+                }
+            }
+            ops.reverse();
+
+            let html = '', buf = '', inDiff = false;
+            for (const op of ops) {
+                if (op.t === 'E') {
+                    if (inDiff) { html += '<span class="diff-add">' + buf + '</span>'; buf = ''; inDiff = false; }
+                    html += escHtml(op.c);
+                } else if (op.t === 'S' || op.t === 'I') {
+                    inDiff = true;
+                    buf += escHtml(op.c);
+                }
+            }
+            if (inDiff) html += '<span class="diff-add">' + buf + '</span>';
+            return html;
         }
 
         // ============ DIFF VIEW ============
@@ -958,16 +1219,28 @@
         
         function updateDiffView() {
             const selectedView = document.querySelector('#diff-view-radios input[type="radio"]:checked')?.value || 'words';
-            const wordDiffs = document.querySelectorAll('.diff-words');
-            const charDiffs = document.querySelectorAll('.diff-chars');
-            
-            if (selectedView === 'words') {
-                wordDiffs.forEach(el => el.style.display = '');
-                charDiffs.forEach(el => el.style.display = 'none');
-            } else {
-                wordDiffs.forEach(el => el.style.display = 'none');
-                charDiffs.forEach(el => el.style.display = '');
-            }
+            document.querySelectorAll('.transcription-card').forEach(card => {
+                const wordDiv = card.querySelector('.diff-words');
+                if (!wordDiv) return;
+                const hypCol = wordDiv.parentElement;
+                if (selectedView === 'chars') {
+                    let charDiv = card.querySelector('.diff-chars');
+                    if (!charDiv) {
+                        const refText = card.querySelector('.transcription-col:first-child .text-content')?.textContent || '';
+                        const hypText = wordDiv.textContent || '';
+                        charDiv = document.createElement('div');
+                        charDiv.className = 'diff-chars';
+                        charDiv.innerHTML = computeCharDiffHtml(refText, hypText);
+                        hypCol.appendChild(charDiv);
+                    }
+                    wordDiv.style.display = 'none';
+                    charDiv.style.display = '';
+                } else {
+                    wordDiv.style.display = '';
+                    const charDiv = card.querySelector('.diff-chars');
+                    if (charDiv) charDiv.style.display = 'none';
+                }
+            });
         }
         
         diffViewRadios.forEach(radio => radio.addEventListener('change', updateDiffView));
@@ -1014,6 +1287,7 @@
                 // We add audio-norm and a unique index
                 const metaParts = [
                     row.dataset.engine,
+                    (row.dataset.language || '').toUpperCase(),
                     row.dataset.degradation,
                     row.dataset.enhancement || 'None',
                     row.dataset.audioNorm || 'None',
@@ -1092,7 +1366,9 @@
             if (!chartDiv) return;
             
             const groupBy = document.getElementById('boxplot-groupby')?.value || 'engine';
-            const metric = document.getElementById('boxplot-metric')?.value || 'wer';
+            const metricSelect = document.getElementById('boxplot-metric');
+            const metric = metricSelect?.value || 'wer';
+            const metricLabel = metricSelect?.options[metricSelect.selectedIndex]?.text || (typeof metricNames !== 'undefined' && metricNames[metric]) || metric.toUpperCase();
             const colorBy = document.getElementById('boxplot-colorby')?.value || 'none';
             
             const tableRows = document.querySelectorAll('#summary-table tbody tr');
@@ -1108,6 +1384,7 @@
                 let groupKey;
                 switch (groupBy) {
                     case 'engine': groupKey = row.dataset.engine; break;
+                    case 'language': groupKey = (row.dataset.language || 'unknown').toUpperCase(); break;
                     case 'degradation': groupKey = row.dataset.degradation; break;
                     case 'enhancement': groupKey = row.dataset.enhancement || 'None'; break;
                     case 'audio_norm': groupKey = row.dataset.audioNorm || 'None'; break;
@@ -1119,6 +1396,7 @@
                 if (colorBy !== 'none') {
                     switch (colorBy) {
                         case 'engine': colorKey = row.dataset.engine; break;
+                        case 'language': colorKey = (row.dataset.language || 'unknown').toUpperCase(); break;
                         case 'degradation': colorKey = row.dataset.degradation; break;
                         case 'enhancement': colorKey = row.dataset.enhancement || 'None'; break;
                         case 'audio_norm': colorKey = row.dataset.audioNorm || 'None'; break;
@@ -1163,10 +1441,10 @@
             });
             
             const layout = {
-                title: `${metric.toUpperCase()} Distribution by ${groupBy.charAt(0).toUpperCase() + groupBy.slice(1)}`,
-                yaxis: { title: metricNames[metric] || metric.toUpperCase(), rangemode: 'tozero' },
+                title: `${metricLabel} Distribution by ${groupBy.charAt(0).toUpperCase() + groupBy.slice(1)}`,
+                yaxis: { title: metricLabel, rangemode: 'tozero' },
                 xaxis: { title: groupBy.charAt(0).toUpperCase() + groupBy.slice(1) },
-                boxmode: 'group',
+                boxmode: (colorBy === 'none' || colorBy === groupBy) ? 'overlay' : 'group',
                 showlegend: colorBy !== 'none',
                 margin: { t: 50, b: 80 }
             };
@@ -1178,6 +1456,315 @@
         document.getElementById('boxplot-groupby')?.addEventListener('change', createBoxPlot);
         document.getElementById('boxplot-metric')?.addEventListener('change', createBoxPlot);
         document.getElementById('boxplot-colorby')?.addEventListener('change', createBoxPlot);
+
+        // ============ CROSS-LANGUAGE ANALYSIS ============
+        function getVisibleResultsData() {
+            // Collect visible results from the data table rows
+            const rows = document.querySelectorAll('#summary-table tbody tr');
+            const data = [];
+            rows.forEach(row => {
+                if (row.style.display === 'none') return;
+                data.push({
+                    engine: row.dataset.engine,
+                    language: (row.dataset.language || 'unknown').toUpperCase(),
+                    degradation: row.dataset.degradation,
+                    enhancement: row.dataset.enhancement || 'None',
+                    audioNorm: row.dataset.audioNorm || 'None',
+                    textNorm: row.dataset.textNorm || 'raw',
+                    wer: parseFloat(row.dataset.wer) || null,
+                    cer: parseFloat(row.dataset.cer) || null,
+                    mer: parseFloat(row.dataset.mer) || null,
+                    wil: parseFloat(row.dataset.wil) || null,
+                    wip: parseFloat(row.dataset.wip) || null,
+                    time: parseFloat(row.querySelector('td:last-child')?.textContent) || null
+                });
+            });
+            return data;
+        }
+
+        function aggregateByKeys(data, keys, metric) {
+            const groups = {};
+            data.forEach(d => {
+                const val = d[metric];
+                if (val === null || isNaN(val)) return;
+                const key = keys.map(k => d[k]).join('|||');
+                if (!groups[key]) groups[key] = { values: [], keyParts: keys.map(k => d[k]) };
+                groups[key].values.push(val);
+            });
+            const result = [];
+            for (const [, g] of Object.entries(groups)) {
+                const vals = g.values;
+                const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+                const std = vals.length > 1 ? Math.sqrt(vals.map(v => (v - mean) ** 2).reduce((a, b) => a + b, 0) / vals.length) : 0;
+                const sorted = [...vals].sort((a, b) => a - b);
+                const median = sorted.length % 2 === 0 ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2 : sorted[Math.floor(sorted.length / 2)];
+                const row = {};
+                keys.forEach((k, i) => row[k] = g.keyParts[i]);
+                row.mean = mean;
+                row.std = std;
+                row.median = median;
+                row.min = Math.min(...vals);
+                row.max = Math.max(...vals);
+                row.count = vals.length;
+                result.push(row);
+            }
+            return result;
+        }
+
+        function createCrossLangCharts() {
+            const selectedMetric = document.querySelector('#crosslang-metric-radios input:checked')?.value || 'wer';
+            const data = getVisibleResultsData();
+
+            // Count distinct visible languages, engines, conditions
+            const visibleLangs = [...new Set(data.map(d => d.language))];
+            const visibleEngines = [...new Set(data.map(d => d.engine))];
+            const isMultiLang = visibleLangs.length > 1;
+
+            // Hide the tab entirely when there's nothing useful to compare
+            // (only 1 result, or only 1 engine with 1 condition = no aggregation possible)
+            const tabBtn = document.getElementById('crosslang-tab-btn');
+            const hasComparativeData = data.length > 1 && (visibleLangs.length > 1 || visibleEngines.length > 1);
+            if (tabBtn) tabBtn.style.display = hasComparativeData ? '' : 'none';
+
+            // If tab is hidden and currently active, switch to Performance
+            if (!hasComparativeData) {
+                const crosslangTab = document.getElementById('tab-crosslang');
+                if (crosslangTab && crosslangTab.classList.contains('active')) {
+                    document.querySelector('.tab-btn[data-tab="performance"]')?.click();
+                }
+                return;
+            }
+
+            // Adapt tab button text
+            if (tabBtn) tabBtn.textContent = isMultiLang ? 'Cross-Language Analysis' : 'Comparative Analysis';
+
+            // Adapt title and subtitle
+            const title = document.getElementById('crosslang-title');
+            const subtitle = document.getElementById('crosslang-subtitle');
+            if (title) title.textContent = isMultiLang ? 'Cross-Language Analysis' : 'Comparative Analysis';
+            if (subtitle) subtitle.textContent = isMultiLang
+                ? 'Compare ASR engine performance across languages and conditions.'
+                : 'Compare ASR engine performance across conditions and configurations.';
+
+            // Adapt bar chart title
+            const barTitle = document.getElementById('crosslang-bar-title');
+            const barDesc = document.getElementById('crosslang-bar-desc');
+            if (barTitle) barTitle.textContent = isMultiLang ? 'Engine Performance by Language' : 'Engine Performance Overview';
+            if (barDesc) barDesc.textContent = isMultiLang
+                ? 'Grouped bar chart comparing each engine\'s mean metric value across languages.'
+                : 'Mean metric value per engine (across all visible conditions).';
+
+            // Show/hide consistency section (meaningless with 1 language)
+            const consistencySection = document.getElementById('crosslang-consistency-section');
+            if (consistencySection) consistencySection.style.display = isMultiLang ? '' : 'none';
+
+            createCrossLangBarChart(data, selectedMetric);
+            createCrossLangHeatmap(data, selectedMetric);
+            if (isMultiLang) createCrossLangConsistency(data, selectedMetric);
+            createAggregatedStatsTable(data);
+        }
+
+        function createCrossLangBarChart(data, metric) {
+            const chartDiv = document.getElementById('crosslang-bar-chart');
+            if (!chartDiv) return;
+
+            const agg = aggregateByKeys(data, ['engine', 'language'], metric);
+            if (agg.length === 0) {
+                Plotly.purge(chartDiv);
+                chartDiv.innerHTML = '<p style="text-align:center; padding: 2rem; color: #888;">No data available</p>';
+                return;
+            }
+
+            const languages = [...new Set(agg.map(r => r.language))].sort();
+            const engines = [...new Set(agg.map(r => r.engine))].sort();
+            const colorPalette = ['#2196F3', '#FF5722', '#4CAF50', '#FFC107', '#9C27B0', '#00BCD4', '#E91E63', '#795548'];
+
+            const traces = languages.map((lang, i) => {
+                const means = engines.map(eng => {
+                    const row = agg.find(r => r.engine === eng && r.language === lang);
+                    return row ? row.mean : null;
+                });
+                const stds = engines.map(eng => {
+                    const row = agg.find(r => r.engine === eng && r.language === lang);
+                    return row ? row.std : null;
+                });
+                return {
+                    x: engines,
+                    y: means,
+                    error_y: { type: 'data', array: stds, visible: true },
+                    name: lang,
+                    type: 'bar',
+                    marker: { color: colorPalette[i % colorPalette.length] }
+                };
+            });
+
+            const layout = {
+                barmode: 'group',
+                yaxis: { title: metricNames[metric] || metric.toUpperCase(), rangemode: 'tozero' },
+                xaxis: { title: 'Engine' },
+                margin: { t: 30, b: 80 },
+                legend: { orientation: 'h', y: -0.15 }
+            };
+
+            Plotly.newPlot(chartDiv, traces, layout, { responsive: true });
+        }
+
+        function createCrossLangHeatmap(data, metric) {
+            const chartDiv = document.getElementById('crosslang-heatmap');
+            if (!chartDiv) return;
+
+            const agg = aggregateByKeys(data, ['engine', 'language'], metric);
+            if (agg.length === 0) {
+                Plotly.purge(chartDiv);
+                chartDiv.innerHTML = '<p style="text-align:center; padding: 2rem; color: #888;">No data available</p>';
+                return;
+            }
+
+            const languages = [...new Set(agg.map(r => r.language))].sort();
+            const engines = [...new Set(agg.map(r => r.engine))].sort();
+
+            // WIP: higher is better, so invert for color scale
+            const isInverted = (metric === 'wip');
+
+            const z = engines.map(eng => {
+                return languages.map(lang => {
+                    const row = agg.find(r => r.engine === eng && r.language === lang);
+                    if (!row) return null;
+                    return isInverted ? 1 - row.mean : row.mean;
+                });
+            });
+
+            const hovertext = engines.map(eng => {
+                return languages.map(lang => {
+                    const row = agg.find(r => r.engine === eng && r.language === lang);
+                    if (!row) return 'N/A';
+                    return `${eng} / ${lang}<br>${metric.toUpperCase()}: ${row.mean.toFixed(4)}<br>Std: ${row.std.toFixed(4)}<br>N: ${row.count}`;
+                });
+            });
+
+            const trace = {
+                z: z,
+                x: languages,
+                y: engines,
+                type: 'heatmap',
+                colorscale: [[0, '#27ae60'], [0.15, '#2ecc71'], [0.3, '#f1c40f'], [0.5, '#e67e22'], [0.75, '#e74c3c'], [1, '#c0392b']],
+                zmin: 0,
+                zmax: Math.max(0.5, ...z.flat().filter(v => v !== null)),
+                hovertext: hovertext,
+                hoverinfo: 'text',
+                showscale: true,
+                colorbar: { title: isInverted ? '1 - ' + metric.toUpperCase() : metric.toUpperCase() }
+            };
+
+            const layout = {
+                xaxis: { title: 'Language', side: 'top', tickangle: 0 },
+                yaxis: { title: 'Engine', autorange: 'reversed', type: 'category' },
+                margin: { l: 200, r: 50, t: 50, b: 30 },
+                height: Math.max(250, engines.length * 50 + 100)
+            };
+
+            Plotly.newPlot(chartDiv, [trace], layout, { responsive: true });
+        }
+
+        function createCrossLangConsistency(data, metric) {
+            const chartDiv = document.getElementById('crosslang-consistency');
+            if (!chartDiv) return;
+
+            const agg = aggregateByKeys(data, ['engine', 'language'], metric);
+            const engines = [...new Set(agg.map(r => r.engine))].sort();
+
+            const consistency = engines.map(eng => {
+                const langMeans = agg.filter(r => r.engine === eng).map(r => r.mean);
+                const overallMean = langMeans.length > 0 ? langMeans.reduce((a, b) => a + b, 0) / langMeans.length : 0;
+                const std = langMeans.length > 1 ? Math.sqrt(langMeans.map(v => (v - overallMean) ** 2).reduce((a, b) => a + b, 0) / langMeans.length) : 0;
+                return { engine: eng, std: std, mean: overallMean };
+            });
+
+            consistency.sort((a, b) => a.std - b.std);
+
+            if (consistency.length === 0) {
+                Plotly.purge(chartDiv);
+                chartDiv.innerHTML = '<p style="text-align:center; padding: 2rem; color: #888;">No data available</p>';
+                return;
+            }
+
+            const trace = {
+                x: consistency.map(c => c.engine),
+                y: consistency.map(c => c.std),
+                type: 'bar',
+                marker: {
+                    color: consistency.map(c => c.std),
+                    colorscale: [[0, '#27ae60'], [0.5, '#f1c40f'], [1, '#e74c3c']],
+                    showscale: false
+                },
+                text: consistency.map(c => c.std.toFixed(4)),
+                textposition: 'outside',
+                hovertext: consistency.map(c => `${c.engine}<br>Cross-lang σ: ${c.std.toFixed(4)}<br>Mean ${metric.toUpperCase()}: ${c.mean.toFixed(4)}`),
+                hoverinfo: 'text'
+            };
+
+            const layout = {
+                yaxis: { title: `Cross-Language Std Dev (${metric.toUpperCase()})`, rangemode: 'tozero' },
+                xaxis: { title: 'Engine' },
+                margin: { t: 20, b: 80 }
+            };
+
+            Plotly.newPlot(chartDiv, [trace], layout, { responsive: true });
+        }
+
+        function createAggregatedStatsTable(data) {
+            const tbody = document.getElementById('aggregated-stats-body');
+            if (!tbody) return;
+
+            const metrics = ['wer', 'cer', 'mer', 'wil', 'wip'];
+            const rows = [];
+
+            // Aggregate by engine+language for each metric
+            const aggs = {};
+            metrics.forEach(m => {
+                aggregateByKeys(data, ['engine', 'language'], m).forEach(r => {
+                    const key = r.engine + '|||' + r.language;
+                    if (!aggs[key]) aggs[key] = { engine: r.engine, language: r.language, count: r.count };
+                    aggs[key][m] = r;
+                });
+            });
+
+            // Also aggregate time
+            aggregateByKeys(data, ['engine', 'language'], 'time').forEach(r => {
+                const key = r.engine + '|||' + r.language;
+                if (aggs[key]) aggs[key].time = r;
+            });
+
+            // Sort by engine then language
+            const sortedKeys = Object.keys(aggs).sort();
+
+            tbody.innerHTML = '';
+            sortedKeys.forEach(key => {
+                const a = aggs[key];
+                const tr = document.createElement('tr');
+                const fmt = (obj) => {
+                    if (!obj || obj.mean === undefined) return '-';
+                    return `${obj.mean.toFixed(4)} ± ${obj.std.toFixed(4)}`;
+                };
+                tr.innerHTML = `
+                    <td>${a.engine}</td>
+                    <td style="text-transform:uppercase; font-weight:600;">${a.language}</td>
+                    <td class="number">${a.count || '-'}</td>
+                    <td class="number">${fmt(a.wer)}</td>
+                    <td class="number">${fmt(a.cer)}</td>
+                    <td class="number">${fmt(a.mer)}</td>
+                    <td class="number">${fmt(a.wil)}</td>
+                    <td class="number">${fmt(a.wip)}</td>
+                    <td class="number">${a.time ? a.time.mean.toFixed(2) + 's' : '-'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Cross-language metric selector
+        document.querySelectorAll('#crosslang-metric-radios input').forEach(radio => {
+            radio.addEventListener('change', createCrossLangCharts);
+        });
 
         // ============ CSV DOWNLOAD ============
         document.getElementById('csv-download-btn')?.addEventListener('click', () => {
@@ -1255,16 +1842,17 @@
         // Initialize table visibility first (needed for heatmap/boxplot)
         updateTableRows();
         updateTranscriptionCards();
-        updateMainChart();
         
-        // Initial sort by WER (column 5, ascending - lowest WER first)
-        sortDirection[5] = "desc";  // Will toggle to "asc" on first call
-        sortTable(5, true);
+        // Initial sort by WER (column 6, ascending - lowest WER first)
+        sortDirection[6] = "desc";  // Will toggle to "asc" on first call
+        sortTable(6, true);
         
         // Delay chart creation to ensure DOM is ready
         setTimeout(() => {
+            createMainScatterChart();
             createMetricsHeatmap();
             createBoxPlot();
+            createCrossLangCharts();
         }, 100);
 
         // Sticky filters bar shadow on scroll
