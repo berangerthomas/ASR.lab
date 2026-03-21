@@ -7,7 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "accelerate>=1.10.1",
     "click",
-    "datasets[audio]>=4.2.0",
+    "datasets>=4.2.0",
     "evaluate>=0.4.6",
     "jiwer>=4.0.0",
     "joblib",
@@ -33,10 +33,12 @@ dependencies = [
     "pydantic>=2.12.4",
     "demucs>=4.0.1",
     "diffq>=0.2.4",
+    "funasr>=1.1.0",
+    "modelscope>=1.9.5",
 ]
 
 [project.optional-dependencies]
-deepfilter = [
+enhancement = [
     "deepfilternet>=0.5.6",
 ]
 

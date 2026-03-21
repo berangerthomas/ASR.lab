@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.1] - 2026-03-21
+
+### Removed
+
+- **Code cleanup**: Removed unused API-based cloud engines (`azure.py`, `deepgram.py`, `google.py`) and inactive engine (`usm.py`).
+- **Unused metrics**: Cleaned up orphans/irrelevant metrics modules (`bleu.py`, `perplexity.py`). Retained `rtf.py` and `latency.py` for potential future scaling.
+- **Legacy reporting**: Removed old non-interactive static HTML reporting scripts and templates (`report.py`, `report_template.html`), as well as trailing backup files, fully transitioning to the modern interactive `report_interactive.py`.
+
 ## [2.0.0] - 2026-03-17
 
 ### Added
